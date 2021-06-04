@@ -1,0 +1,1484 @@
+RED HAT ENTERPRISE LINUX 6
+‘CIS – FAILED CONTROLS’ FIXING GUIDE
+By Devarishi Kumar Mahadeva
+
+
+Overview
+Security / Compliance (Global Risk Compliance & Vulnerability) Team has identified failed controls that can be addressed by following the present guide.
+
+Scope
+The present guide is applicable to Controls Labeled as CRITICAL / SERIOUS / URGENT / MEDIUM in the compliance report as shared by the Security / Compliance Team from time to time.
+ 
+Control: Status of the 'exec|noexec' mount options for the '/dev/shm' partition in the '/etc/fstab' file
+Audit & Remediate: Unless there is a business requirement, it should be set to “noexec”.
+
+Control ID	7407
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+1.	The following commands would list mount point entries in the /etc/fstab file:
+# grep -E '^.*\s/dev/shm\s.*\bexec\b.*$' /etc/fstab
+# mount | grep -E '^.*\s/dev/shm\s.*\bexec\b.*$'
+
+2.	Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the /dev/shm partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,noexec /dev/shm
+ 
+Control: Current list of world writable directories that do not have the sticky bit configured.
+Audit & Remediate: Ensure sticky bit is set on all world-writable directories.
+
+Control ID	7408
+Criticality Label	CRITICAL
+Artifact / File	Local Mount Points
+
+1.	List all local directories with world-writable permission without sticky bit set on them:
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -a ! -perm -1000 2>/dev/null
+2.	Set Sticky Bit on the directories found in the above step:
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -a ! -perm -1000 2>/dev/null | xargs chmod a+t
+ 
+Control: Status of the 'gpgcheck' setting within the main (global) section of the '/etc/yum.conf' file.
+Audit & Remediate: Ensure gpgcheck is globally activated (set to 1).
+
+Control ID	10847	Note
+Criticality Label	CRITICAL / SERIOUS	
+Artifact / File	/etc/yum.conf	CRITICAL
+Artifact / File	/etc/yum.repos.d/*	SERIOUS
+
+1.	Run the following command to check if the compliance requirement is not met:
+# grep ^gpgcheck /etc/yum.conf /etc/yum.repos.d/*
+If we get the text “gpgcheck=1” in the output from the above command, then it confirms that we are compliant. If not, then run the following command:
+2.	Take a backup of the files
+# for FILE in /etc/security/limits.conf /etc/security/limits.d/* /etc/sysctl.conf ; do cp -pv $FILE ${FILE}-BACKUP-$(date +%F-%T) ; done
+3.	Replace gpgcheck=0 with gpgcheck=1 and update the files:
+# sed -i 's/^gpgcheck=0/gpgcheck=1/' /etc/yum.conf /etc/yum.repos.d/*
+ 
+Control: Status of the 'periodically scheduled (crontab)' aide check (/etc/cron.* and /etc/crontab).
+Audit & Remediate: Status of the 'periodically scheduled (crontab)' AIDE (Advanced Intrusion Detection Environment) package check (/etc/cron.* and /etc/crontab).
+
+Control ID	10859
+Criticality Label	CRITICAL
+Artifact / File / Directory	RPM / Package aide
+
+1.	Check if a crontab is configured to check for the package aide:
+
+# grep –E ‘^[^:]+:.+\s/usr/sbin/aide\s.*’ /etc/cron.* /etc/crontab
+
+2.	Check if the package is installed:
+
+# rpm –q aide
+
+3.	Install the package if not installed:
+
+# yum install aide
+# aide --init
+
+ 
+Control: Status of the 'Ownership' settings for the GRUB bootloader config file.
+
+Audit & Remediate: Ownership settings for the GRUB bootloader configuration file must be set to root:root only.
+
+Control ID	7335
+Criticality Label	CRITICAL
+Artifact / File / Directory	/boot/grub/grub.conf
+
+
+1.	Check the current ownership set on the file:
+
+# ls -l /boot/grub/grub.conf
+-rw-r--r-- 1 root root 1906 Oct 22  2020 /boot/grub/grub.conf
+
+2.	The above example shows a PASSED check. If it fails, fix it by running the following command:
+
+# chown root:root /boot/grub/grub.conf 
+
+
+ 
+Control: Status of the 'Permissions' settings for the '/boot/grub/grub.conf' file.
+Audit & Remediate: Group and Others must not have any permission on the GRUB bootloader configuration file.
+
+Control ID	7334
+Criticality Label	CRITICAL
+Artifact / File / Directory	/boot/grub/grub.conf
+
+
+
+1.	Check the current permissions set on the file:
+
+# ls -l /boot/grub/grub.conf
+-rw-r--r-- 1 root root 1906 Oct 22  2020 /boot/grub/grub.conf
+
+2.	The above example shows a FAILED check, hence fix it by running the following command:
+
+# chmod og-rwx /boot/grub/grub.conf
+
+ 
+Control: Status of password configured for Legacy GRUB.
+Audit & Remediate: Ensure bootloader password is set.
+
+Control ID	13253
+Criticality Label	CRITICAL
+Artifact / File / Directory	/boot/grub/grub.conf
+
+1.	Check if a password is already set:
+# grep "^password" /boot/grub/grub.conf
+
+2.	If not, then first back-up the file:
+
+# cp –pv /boot/grub/grub.conf  /boot/grub/grub.conf-BACKUP-$(date +%F-%T)
+3.	Set an encrypted password:
+# grub-md5-crypt
+4.	Copy the password obtained from the above command’s output and paste it into the global section of /boot/grub/grub.conf file:
+
+password --md5 <encrypted-password>
+
+ 
+Control: Status of the 'SINGLE' setting in the '/etc/sysconfig/init' file.
+Audit & Remediate: Ensure that authentication is required for the single user mode.
+
+Control ID	7433
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysconfig/init
+
+
+1.	Verify SINGLE is set to ' /sbin/sulogin ': 
+# grep ^SINGLE /etc/sysconfig/init 
+2.	If the output from the above command does not show any text or returns “SINGLE=/sbin/sushell” then edit the file /etc/sysconfig/init and set:
+
+SINGLE=/sbin/sulogin
+
+3.	Backup the file:
+# cp –pv /etc/sysconfig/init /etc/sysconfig/init-BACKUP-$(date +%F-%T)
+4.	Make in-place changes in the file, if not done so in the step# 2:
+# sed –i 's#SINGLE=.*#SINGLE=/sbin/sulogin#' /etc/sysconfig/init
+ 
+Control: Status of the 'PROMPT' setting in the '/etc/sysconfig/init' file
+Audit & Remediate: Ensure that interactive boot mode is not enabled.
+
+Control ID	7434
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysconfig/init
+ 
+
+1.	Run the following command and verify PROMPT is set to ' no ':
+# grep "^PROMPT=" /etc/sysconfig/init
+2.	If the check fails, then follow these steps:
+a.	Backup the file:
+# cp –pv /etc/sysconfig/init /etc/sysconfig/init-BACKUP-$(date +%F-%T)
+b.	Edit the /etc/sysconfig/init file and set:
+PROMPT=no
+c.	Make in-place changes in the file, if not done so in the step# 2:
+# sed –i 's/PROMPT=yes/PROMPT=no/' /etc/sysconfig/init
+ 
+Control: Status of the network parameter 'fs.suid_dumpable' using 'sysctl' utility (runtime).
+Audit & Remediate: Ensure core dumps are restricted for SETUID programs.
+
+Control ID	7435
+Criticality Label	CRITICAL
+Artifact / File / Directory	
+
+1.	Run the following command and verify output matches:
+# sysctl fs.suid_dumpable
+fs.suid_dumpable = 0
+2.	If not, then run the following command to set the active kernel parameter:
+# sysctl -w fs.suid_dumpable=0
+
+NOTE: Also check Control ID# 10508
+ 
+Control: Status of the network parameter 'fs.suid_dumpable' setting within '/etc/sysctl.conf' file.
+Audit & Remediate: Ensure core dumps are restricted for SETUID programs.
+
+Control ID	10508
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+
+1.	Backup the file involved:
+# cp -pv /etc/security/limits.conf /etc/security/limits.conf-BACKUP-$(date +%F-%T)
+2.	Set the following parameter in the /etc/sysctl.conf file:
+fs.suid_dumpable = 0
+
+NOTE: Also check Control ID# 7435.
+
+ 
+Control: Status of the 'fs.suid_dumpable' parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure core dumps are restricted for SETUID programs.
+
+Control ID	12785
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/*
+/run/sysctl.d/*
+/usr/lib/sysctl.d/*
+
+1.	Check if any settings for fs.suid_dumpable is found:
+# grep –E ‘^[^:]+:\s*fs.suid_dumpable\s*=\s*0\s*$’ /etc/sysctl.d/* /run/sysctl.d/* /usr/lib/sysctl.d/*
+2.	Make changes in the files that show up in the output from the above command, and change the parameter to:
+fs.suid_dumpable = 0
+
+NOTE: The official guide of CIS for RHEL 6 does not talk about the directories mentioned in the table above. However, these valid directories and files are mentioned therein, and the remediation steps are accordingly given below:
+ 
+
+1.	Run the following commands and verify output matches:
+# grep "hard core" /etc/security/limits.conf /etc/security/limits.d/*
+* hard core 0
+# sysctl fs.suid_dumpable
+fs.suid_dumpable = 0
+2.	Backup the files involved:
+# for FILE in /etc/security/limits.conf /etc/security/limits.d/* /etc/sysctl.conf ; do cp -pv $FILE ${FILE}-BACKUP-$(date +%F-%T) ; done
+3.	Add the following line to the /etc/security/limits.conf file or in the files under /etc/security/limits.d/* directory:
+* hard core 0
+4.	Set the following parameter in the /etc/sysctl.conf file:
+fs.suid_dumpable = 0
+5.	Run the following command to set the active kernel parameter:
+# sysctl -w fs.suid_dumpable=0
+
+NOTE: Also check Control ID# 10508 & 7435.
+ 
+Control: Status of the network parameter 'kernel.randomize_va_space'
+Audit & Remediate: Ensure address space layout randomization (ASLR) is enabled.
+
+Control ID	7436
+Criticality Label	CRITICAL
+Artifact / File / Directory	
+
+1.	Run the following command and verify output matches:
+# sysctl kernel.randomize_va_space
+kernel.randomize_va_space = 2
+2.	If not, then run the following command to set the active kernel parameter:
+# sysctl -w kernel.randomize_va_space=2
+
+Note: Also check Control ID# 10507 
+
+
+Control: Status of the network parameter 'kernel.randomize_va_space' setting within the '/etc/sysctl.conf' file.
+Audit & Remediate: Ensure address space layout randomization (ASLR) is enabled.
+
+Control ID	10507
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+
+1.	Check if we have a matching parameter set in the file /etc/sysctl.conf:
+# grep 'kernel.randomize_va_space' /etc/sysctl.conf
+2.	Backup the file:
+# cp –pv /etc/sysctl.conf /etc/sysctl.conf-BACKUP-$(date +%F-%T)
+3.	To make the changes permanent, go to the end of the /etc/sysctl.conf file, and set the following parameter:
+kernel.randomize_va_space = 2
+
+Note: Also check Control ID# 7436 
+Control: Status of the 'kernel.randomize_va_space' parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure address space layout randomization (ASLR) is enabled.
+
+Control ID	12786
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/*
+/run/sysctl.d/*
+/usr/lib/sysctl.d/*
+
+1.	Check if we have a matching parameter set in any of the files found in these directories:
+# grep 'kernel.randomize_va_space' /etc/sysctl.d/* /run/sysctl.d/* /usr/lib/sysctl.d/*
+2.	Backup the files as returned in the output from the step# 1. An example is given below:
+# for FILE in /etc/sysctl.d/* /run/sysctl.d/* /usr/lib/sysctl.d/* ; do cp -pv $FILE ${FILE}-BACKUP-$(date +%F-%T) ; done
+
+3.	To make the changes permanent, go to the end of each of the files, and set the following parameter, if not already set:
+kernel.randomize_va_space = 2
+
+Note: Also check Control ID# 7436
+ 
+Control: Status of the 'Prelink' package
+Audit & Remediate: Ensure “prelink” is disabled.
+
+Control ID	9223
+Criticality Label	CRITICAL
+Artifact / File / Directory	Prelink Package / RPM
+
+1.	Check if the “prelink” package is installed:
+# rpm -q prelink
+package prelink is not installed
+2.	Restore binaries to normal, if “prelink” is installed:
+# prelink -ua
+3.	Finally, uninstall “prelink”:
+# yum remove prelink
+
+ 
+Control: Status of the hardware architecture and operating system information (os release, os name, os version) contained in the '/etc/motd' file on the host
+Audit & Remediate: Ensure message of the day (/etc/motd file) is configured properly and does not show up any information about the Linux OS when a user login is authenticated.
+
+Control ID	8123
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/motd
+
+1.	Check for any matching string related to OS Name & Version, Machine Architecture, Kernel Release, etc.:
+# grep -E '(\\v|\\r|\\m|\\s)' /etc/motd
+2.	Backup and edit the /etc/motd and remove any instances of \m, \r , \s , or \v.
+# cp –pv /etc/motd /etc/motd-BACKUP-$(date +%F-%T)
+
+ 
+Control: Permissions set for the '/etc/issue' file
+Audit & Remediate: Ensure /etc/issue file has appropriate access set to it.
+
+Control ID	2264
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/issue
+
+1.	Run any of the following commands to verify that only root user can modify it:
+# ls –l /etc/issue
+# ls -l /etc/issue | grep  -E '\-rw-r--r--.+ root root' && echo "Check Passed" || echo "Check Failed"
+# stat /etc/issue | grep -E '0644/.+Uid:.+root.+Gid.+root'
+
+Note: Also check Control ID# 4743
+ 
+Control: Ownership set for the '/etc/issue' file
+Audit & Remediate: Ensure /etc/issue file has appropriate access set to it.
+
+Control ID	4743
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/issue
+
+1.	Run any of the following commands to verify that user and group level ownership is set for root user only:
+# ls –l /etc/issue
+# stat /etc/issue | grep -E 'Uid:.+root.+Gid.+root\)'
+# stat /etc/issue | grep -E '0644/.+Uid:.+root.+Gid.+root'
+
+Note: Also check Control ID# 2264
+ 
+Control: Status of the 'user-db' parameter in '/etc/dconf/profile/gdm'
+Audit & Remediate: Ensure GDM login banner is configured properly and as per business requirements.
+
+Control ID	10724
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/dconf/profile/gdm
+
+1.	The check is passed if the file is not present:
+ls –l /etc/dconf/profile/gdm
+2.	The check is passed if the given RegEx is matched:
+# grep –E ‘^[^:]+:\s*user\b’ /etc/dconf/profile/gdm
+Note: This is a valid passed check:
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf
+ls: cannot access /etc/dconf: No such file or directory
+OR
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf/profile/gdm
+ls: cannot access /etc/dconf/profile/gdm: No such file or directory
+
+Note: Also check Control ID# 10725 & 10726
+ 
+Control: Status of the 'system-db' parameter in '/etc/dconf/profile/gdm'
+Audit & Remediate: Ensure GDM login banner is configured properly and as per business requirements.
+
+Control ID	10725
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/dconf/profile/gdm
+
+1.	The check is passed if the file is not present:
+ls –l /etc/dconf/profile/gdm
+2.	The check is passed if the given RegEx is matched:
+# grep –E ‘^[^:]+:\s*gdm\b’ /etc/dconf/profile/gdm
+Note: This is a valid passed check:
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf
+ls: cannot access /etc/dconf: No such file or directory
+OR
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf/profile/gdm
+ls: cannot access /etc/dconf/profile/gdm: No such file or directory
+
+Note: Also check Control ID# 10724 & 10726
+ 
+Control: Status of the 'file-db' parameter in /etc/dconf/profile/gdm
+Audit & Remediate: Ensure GDM login banner is configured properly and as per business requirements.
+
+Control ID	10726
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/dconf/profile/gdm
+
+1.	The check is passed if the file is not present:
+ls –l /etc/dconf/profile/gdm
+2.	The check is passed if the given RegEx is matched:
+# grep –E ‘^[^:]+:\s*/usr/share/gdm/greeter-dconf-defaults’ /etc/dconf/profile/gdm
+Note: This is a valid passed check:
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf
+ls: cannot access /etc/dconf: No such file or directory
+OR
+[root@nznsvfnux159: Legacy_DNS2_uxtools :~]$ ls -l /etc/dconf/profile/gdm
+ls: cannot access /etc/dconf/profile/gdm: No such file or directory
+
+Note: Also check Control ID# 10724 & 10725
+ 
+Control: Status of the 'chargen-dgram' service
+Audit & Remediate: Ensure chargen services are disabled.
+
+Control ID	7437
+Criticality Label	CRITICAL
+Artifact / File / Directory	chargen-dgram   Service
+
+1.	Ensure the result from the following command matches:
+# chkconfig --list chargen-dgram
+chargen-dgram   off
+2.	If not, then stop and disable the service:
+
+# service stop chargen-dgram
+# chkconfig chargen-dgram off
+
+ 
+Control: Status of the 'chargen-stream' service
+Audit & Remediate: Ensure chargen services are disabled.
+
+Control ID	7438
+Criticality Label	CRITICAL
+Artifact / File / Directory	chargen-stream  Service
+
+1.	Ensure the result from the following command matches:
+chkconfig --list chargen-stream
+chargen-stream  off
+2.	If not, then stop and disable the service:
+# service stop chargen-stream
+# chkconfig chargen-stream off
+ 
+
+Control: Status of the 'daytime-dgram' service
+Audit & Remediate: Ensure daytime services are disabled.
+
+Control ID	7415
+Criticality Label	CRITICAL
+Artifact / File / Directory	daytime-dgram  Service
+
+1.	Ensure the result from the following command matches:
+# chkconfig --list daytime-dgram
+daytime-dgram off
+2.	If not, then stop and disable the service:
+# service stop daytime-dgram
+# chkconfig daytime-dgram off
+
+ 
+Control: Status of the 'daytime-stream' service
+Audit & Remediate: Ensure daytime services are disabled.
+
+Control ID	7416
+Criticality Label	CRITICAL
+Artifact / File / Directory	daytime-stream  Service
+
+1.	Ensure the result from the following command matches:
+# chkconfig --list daytime-stream
+daytime-stream off
+2.	If not, then stop and disable the service:
+# service stop daytime-stream
+# chkconfig daytime-stream off
+
+ 
+Control: Status of the 'dovecot' service
+Audit & Remediate: Ensure IMAP and POP3 server is not enabled.
+
+Control ID	1943
+Criticality Label	CRITICAL
+Artifact / File / Directory	dovecot Service
+
+1.	The following example shows a FAILED check:
+
+# chkconfig --list dovecot
+dovecot         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+
+2.	Stop and disable the service:
+
+# service stop dovecot
+# chkconfig dovecot off
+
+ 
+Control: Status of the Mail Transfer Agent for Local-Only Mode
+Audit & Remediate: Ensure SMTP service is enabled for the localhost only unless a particular server is configured to act as a Mail Server.
+
+Control ID	9380
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/mail/sendmail.cf
+
+1.	Check if SendMail is configured for the localhost only:
+
+# netstat -lpn | grep :25
+tcp        0      0 0.0.0.0:25                  0.0.0.0:*                   LISTEN      5113/sendmail: reje
+The above check is FAILED.
+2.	Here is an example of SendMail configurations:
+a.	Edit the configuration file: /etc/mail/sendmail.cf and go to the following line:
+O DaemonPortOptions=Port=smtp,Addr=0.0.0.0, Name=MTA
+b.	Change as shown below:
+O DaemonPortOptions=Port=smtp,Addr=127.0.0.1, Name=MTA
+
+ 
+Control: Status of the 'inet_interfaces' setting in the '/etc/postfix/main.cf' file
+Audit & Remediate: Ensure SMTP service is enabled for the localhost only unless a particular server is configured to act as a Mail Server.
+
+Control ID	7458
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/postfix/main.cf
+
+1.	Check if Postfix is configured for the localhost only.
+a.	A PASSED check would look like the following:
+# netstat -lpn | grep -E '\s(::1|127\.0\.0\.1):25\b'
+tcp        0      0 127.0.0.1:25            0.0.0.0:*               LISTEN      1297/master
+tcp6       0      0 ::1:25                  :::*                    LISTEN      1297/master
+b.	Verify the configuration file:
+# grep 'inet_interfaces = localhost' /etc/postfix/main.cf
+inet_interfaces = localhost
+2.	Here is an example of PostFix configurations:
+a.	 Edit /etc/postfix/main.cf and add the following line to the RECEIVING MAIL section. If the line already exists, change it to look like the line below:
+inet_interfaces = localhost
+b.	Restart postfix:
+# service postfix restart
+ 
+Control: Status of the Network Information Service (NIS-client)
+Audit & Remediate: Ensure NIS Client is not installed.
+
+Control ID	9372
+Criticality Label	CRITICAL
+Artifact / File / Directory	ypbind Package / RPM
+
+1.	Check if the ypbind package is installed:
+# rpm -q ypbind
+ypbind-1.20.4-33.el6.x86_64
+The above check is FAILED.
+2.	Remove the package:
+# yum remove ypbind
+ 
+Control: Status of the rsh package
+Audit & Remediate: Ensure rsh client / package is not installed.
+
+Control ID	9370
+Criticality Label	CRITICAL
+Artifact / File / Directory	rsh Package / RPM
+
+1.	Check if the ypbind package is installed:
+# rpm -q rsh
+package rsh is not installed
+The above check is PASSED.
+2.	If not, then remove the package:
+# yum remove rsh
+ 
+Control: Status of the 'talk (client)' package on the host
+Audit & Remediate: Ensure talk client / package is not installed.
+
+Control ID	7943
+Criticality Label	CRITICAL
+Artifact / File / Directory	talk Package / RPM
+
+1.	Check if the talk package is installed:
+# rpm -q talk
+package talk is not installed
+The above check is PASSED.
+2.	If not, then remove the package:
+# yum remove talk
+
+ 
+Control: Status of the 'telnet-client' package on the host
+Audit & Remediate: Ensure telnet client / package is not installed.
+
+Control ID	7948
+Criticality Label	CRITICAL
+Artifact / File / Directory	telnet Package / RPM
+
+1.	Check if the telnet package is installed:
+# rpm -q telnet
+telnet-0.17-60.el7.x86_64
+The above check is FAILED.
+2.	If not, then remove the package:
+# yum remove telnet
+
+ 
+Control: Status of the current setting for 'net.ipv4.ip_forward' network parameter
+Audit & Remediate: The net.ipv4.ip_forward flag is used to tell the system whether it can forward packets or not. Ensure IP forwarding is disabled if a server is not configured to act as a Firewall Server or a Gateway to forward packets.
+
+Control ID	5963
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.ip_forward Kernel Parameter
+
+1.	Check if the IPv4 is disabled:
+# sysctl net.ipv4.ip_forward
+net.ipv4.ip_forward = 1
+The above check is FAILED.
+2.	Fix it by executing the following commands which change the active Kernel parameter:
+# sysctl -w net.ipv4.ip_forward=0
+net.ipv4.ip_forward = 0
+# sysctl -w net.ipv4.route.flush=1
+net.ipv4.route.flush = 1
+
+Note: Also check Control ID# 1778
+ 
+Control: Status of the 'ipv4.ip_forward' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: The net.ipv4.ip_forward flag is used to tell the system whether it can forward packets or not. Ensure IP forwarding is disabled if a server is not configured to act as a Firewall Server or a Gateway to forward packets.
+
+Control ID	1778
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+
+1.	Check if the given parameter is set in the configuration file:
+# grep ‘net.ipv4.ip_forward = 0’ /etc/sysctl.conf
+2.	Edit the /etc/sysctl.conf file and set the following parameter:
+net.ipv4.ip_forward = 0
+3.	Run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.ip_forward=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5963
+
+ 
+Control: Status of the 'net.ipv4.ip_forward' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories.
+Audit & Remediate: The net.ipv4.ip_forward flag is used to tell the system whether it can forward packets or not. Ensure IP forwarding is disabled if a server is not configured to act as a Firewall Server or a Gateway to forward packets.
+
+Control ID	12787
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/
+/run/sysctl.d/
+/usr/lib/sysctl.d/
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep -Fr 'net.ipv4.ip_forward = 0' /etc/sysctl.d/ /run/sysctl.d/ /usr/lib/sysctl.d/
+OR
+# grep -Fr 'net.ipv4.ip_forward = 0' /etc/sysctl.d/ /run/sysctl.d/ /usr/lib/sysctl.d/
+/etc/sysctl.d/99-oracle-database-preinstall-18c-sysctl.conf:net.ipv4.ip_forward = 0
+/etc/sysctl.d/99-initial-sysctl.conf:net.ipv4.ip_forward = 0
+NOTE: On this host (IP# 10.115.4.79) where the check has been reported as FAILED, the following condition was found:
+[root@nznsvfnux159:~]$ grep -Fr 'net.ipv4.ip_forward = 0' /etc/sysctl.d/ /run/sysctl.d/ /usr/lib/sysctl.d/
+grep: /run/sysctl.d/: No such file or directory
+grep: /usr/lib/sysctl.d/: No such file or directory
+The “/etc/sysctl.d/” directory does not contain any configuration file with respect to the ‘net.ipv4.ip_forward’ parameter. Hence, the check has been marked as FAILED.
+ 
+Control: Status of the 'net.ipv4.conf.all.send_redirects' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+
+Control ID	1779
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+
+ 
+1.	Run the following command to check if the parameter is set:
+# grep -F 'net.ipv4.conf.all.send_redirects' /etc/sysctl.conf
+net.ipv4.conf.all.send_redirects = 0
+2.	If not, then backup the configuration file:
+# cp -pv /etc/sysctl.conf /etc/sysctl.conf-BACKUP-$(date +%F-%T)
+3.	Set the following parameters in the /etc/sysctl.conf file:
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+4.	Run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.send_redirects=0
+# sysctl -w net.ipv4.conf.default.send_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5964 and 5965
+ 
+Control: Status of the current setting for 'net.ipv4.conf.all.send_redirects' parameter
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+Control ID	5965
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.send_redirects Parameter
+ 
+1.	Check the current setting of the ‘net.ipv4.conf.all.send_redirects’ parameter:
+# sysctl net.ipv4.conf.all.send_redirects
+net.ipv4.conf.all.send_redirects = 1
+The above check is FAILED. 
+2.	Run the following commands to change the active Kernel parameters:
+# sysctl -w net.ipv4.conf.all.send_redirects=0
+# sysctl -w net.ipv4.conf.default.send_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5964 & 1779
+ 
+Control: Status of the current setting for 'net.ipv4.conf.default.send_redirects' network parameter.
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+Control ID	5964
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.default.send_redirects' Parameter
+ 
+1.	Check the current setting of the ‘net.ipv4.conf.all.send_redirects’ parameter:
+# sysctl 'net.ipv4.conf.default.send_redirects'
+net.ipv4.conf.default.send_redirects = 1 
+The above check is FAILED. 
+2.	Run the following commands to change the active Kernel parameters:
+# sysctl -w net.ipv4.conf.default.send_redirects=0
+# sysctl -w net.ipv4.conf.all.send_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5965 & 1779
+ 
+Control: Status of the 'net.ipv4.conf.default.send_redirects' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+Control ID	1780
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+ 
+1.	Run the following command to check if the parameter is set:
+# grep -F "net.ipv4.conf.default.send_redirects" /etc/sysctl.conf
+net.ipv4.conf.default.send_redirects = 0 
+2.	If the parameter is not found, then backup the configuration file before editing it:
+# cp -pv /etc/sysctl.conf /etc/sysctl.conf-BACKUP-$(date +%F-%T)
+3.	Set the following parameters in the /etc/sysctl.conf file:
+net.ipv4.conf.default.send_redirects = 0
+4.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.default.send_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5964 and 5965
+
+ 
+Control: Status of the 'net.ipv4.conf.all.send_redirects' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+Control ID	12788
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/
+/run/sysctl.d/
+/usr/lib/sysctl.d/
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep -rF “net.ipv4.conf.all.send_redirects = 0” /etc/sysctl.d/ /run/sysctl.d/ /usr/lib/sysctl.d/
+NOTE: On this host (IP# 10.115.42.100) where the check has been reported as FAILED, the following condition was found:
+ [root@dcprodau200:~]# grep -Fr “net.ipv4.conf.all.send_redirects = 0” /etc/sysctl.d/ /run/sysctl.d/ /usr/lib/sysctl.d/
+grep: /run/sysctl.d/: No such file or directory
+grep: /usr/lib/sysctl.d/: No such file or directory
+[root@dcprodau200:~]# ls /etc/sysctl.d/
+[root@dcprodau200:~]#
+The “/etc/sysctl.d/” directory does not contain any configuration file with respect to the 'net.ipv4.conf.all.send_redirects' parameter. Hence, the check has been marked as FAILED.
+2.	The following command adds the parameter into the file provided. If the file does not exist already, it is created as shown below:
+
+# echo “net.ipv4.conf.all.send_redirects = 0” >> /etc/sysctl.d/99-initial-sysctl.conf
+ 
+Control: Status of the 'net.ipv4.conf.default.send_redirects' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure packet redirect sending is disabled.
+
+Control ID	12789
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/
+/run/sysctl.d/
+/usr/lib/sysctl.d/
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep  -rF 'net.ipv4.conf.default.send_redirects' /etc/sysctl.d/* /usr/lib/sysctl.d/* /run/sysctl.d/* 2>/dev/null
+/etc/sysctl.d/99-initial-sysctl.conf:net.ipv4.conf.default.send_redirects = 0
+/etc/sysctl.d/99-oracle-database-preinstall-18c-sysctl.conf:net.ipv4.conf.default.send_redirects = 0
+NOTE: On this host (IP# 10.116.74.115) where the check has PASSED as the /etc/sysctl.d/ directory contains the above shown files that have the parameter set into them. 
+2.	The following command adds the parameter into the file provided. If the file does not exist already, it is created as shown below:
+
+# echo “net.ipv4.conf.default.send_redirects = 0” >> /etc/sysctl.d/99-initial-sysctl.conf
+
+Note: Also check Control ID# 5964 and 5965
+ 
+Control: Status of the current setting for 'net.ipv4.conf.all.accept_source_route' network parameter
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	5936
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.accept_source_route
+
+1.	Run the following commands and verify output matches:
+# sysctl net.ipv4.conf.all.accept_source_route
+net.ipv4.conf.all.accept_source_route = 0
+2.	Run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.accept_source_route=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 1774
+ 
+Control: Status of the 'net.ipv4.conf.all.accept_source_route' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	1774
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+net.ipv4.conf.all.accept_source_route
+
+1.	Check the current setting of the parameter:
+# grep ‘net.ipv4.conf.all.accept_source_route = 0’ /etc/sysctl.conf
+2.	Set the following parameter in the /etc/sysctl.conf file:
+net.ipv4.conf.all.accept_source_route = 0
+3.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.accept_source_route=0
+# sysctl net.ipv4.conf.all.accept_source_route = 0
+# sysctl -w net.ipv4.route.flush=1
+
+
+Note: Also check Control ID# 5936
+ 
+Control: Status of the current setting for 'net.ipv4.conf.default.accept_source_route' network parameter
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	5959
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.default.accept_source_route'
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.default.accept_source_route
+net.ipv4.conf.default.accept_source_route = 0
+2.	Rum the following command to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.default.accept_source_route=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the 'net.ipv4.conf.default.accept_source_route' setting within the /etc/sysctl.conf file
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	2321
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+'net.ipv4.conf.default.accept_source_route'
+
+1.	Check the current setting of the parameter:
+# grep 'net.ipv4.conf.default.accept_source_route = 0’ /etc/sysctl.conf
+net.ipv4.conf.default.accept_source_route = 0
+2.	Set the following parameter in the /etc/sysctl.conf file:
+net.ipv4.conf.default.accept_source_route = 0
+3.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.default.accept_source_route=0
+# sysctl net.ipv4.conf.default.accept_source_route
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the 'net.ipv4.conf.all.accept_source_route' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	12790
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.accept_source_route
+'/etc/sysctl.d/'
+'/run/sysctl.d/'
+'/usr/lib/sysctl.d/'
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep  -rF “net.ipv4.conf.all.accept_source_route” /etc/sysctl.d/* /usr/lib/sysctl.d/* /run/sysctl.d/* 2>/dev/null
+2.	If found, the parameter’s value must be 0, otherwise edit the file found and change the value accordingly.
+ 
+Control: Status of the 'net.ipv4.conf.default.accept_source_route' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	12791
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.default.accept_source_route' 
+'/etc/sysctl.d/'
+'/run/sysctl.d/'
+'/usr/lib/sysctl.d/'
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep  -rF “net.ipv4.conf.default.accept_source_route” /etc/sysctl.d/* /usr/lib/sysctl.d/* /run/sysctl.d/* 2>/dev/null
+2.	If found, the parameter’s value must be 0, otherwise edit the file found and change the value accordingly.
+ 
+Control: Status of the current setting for 'net.ipv4.conf.all.accept_redirects' network parameter
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	5956
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.all.accept_redirects'
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.all.accept_redirects
+net.ipv4.conf.all.accept_redirects = 1
+2.	The above check is FAILED. Rum the following command to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.accept_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the current setting for 'net.ipv4.conf.all.accept_redirects' network parameter
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	5956
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.all.accept_redirects'
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.all.accept_redirects
+net.ipv4.conf.all.accept_redirects = 1
+3.	The above check is FAILED. Rum the following command to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.accept_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the 'all.accept_redirects' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	1768
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.accept_redirects
+/etc/sysctl.conf
+
+1.	Check the current setting of the parameter:
+# grep ‘net.ipv4.conf.all.accept_redirects = 0’ /etc/sysctl.conf
+2.	If not found, set the following parameter in the /etc/sysctl.conf file:
+net.ipv4.conf.all.accept_redirects = 0
+3.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.accept_redirects=0
+# sysctl net.ipv4.conf.all.accept_redirects
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 5960
+ 
+Control: Status of the current setting for 'net.ipv4.conf.default.accept_redirects' network parameter
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	5960
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.accept_redirects
+/etc/sysctl.conf
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.all.accept_redirects
+2.	If not set to “0”, run the following commands to set the active kernel parameters
+ # sysctl -w net.ipv4.conf.all.accept_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+Note: Also check Control ID# 1768
+ 
+Control: Status of the 'default.accept_redirects' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure ICMP redirects are not accepted
+
+Control ID	1769
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.default.accept_redirects 
+/etc/sysctl.conf
+
+1.	Check the current setting of the parameter:
+# grep ‘net.ipv4.conf.default.accept_redirects = 0’ /etc/sysctl.conf
+2.	If not found, set the following parameter in the /etc/sysctl.conf file:
+net.ipv4.conf.default.accept_redirects = 0
+3.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.default.accept_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the 'net.ipv4.conf.all.accept_redirects' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	12792
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.accept_redirects
+'/etc/sysctl.d/'
+'/run/sysctl.d/'
+'/usr/lib/sysctl.d/'
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep  -rF “net.ipv4.conf.all.accept_redirects” /etc/sysctl.d/* /usr/lib/sysctl.d/* /run/sysctl.d/* 2>/dev/null
+2.	If found, the parameter’s value must be 0, otherwise edit the file found and change the value accordingly.
+ 
+Control: Status of the 'net.ipv4.conf.default.accept_redirects' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	12793
+Criticality Label	CRITICAL
+Artifact / File / Directory	'net.ipv4.conf.default.accept_redirects' 
+'/etc/sysctl.d/'
+'/run/sysctl.d/'
+'/usr/lib/sysctl.d/'
+
+1.	Check if the given parameter is set in any of the configuration files:
+# grep  -rF “net.ipv4.conf.default.accept_redirects” /etc/sysctl.d/* /usr/lib/sysctl.d/* /run/sysctl.d/* 2>/dev/null
+2.	If found, the parameter’s value must be 0, otherwise edit the file found and change the value accordingly.
+
+ 
+Control: Status of the current setting for 'net.ipv4.conf.all.secure_redirects' network parameter
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	5957
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.secure_redirects
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.all.secure_redirects
+2.	If not set to “0”, run the following commands to set the active kernel parameters
+# sysctl -w net.ipv4.conf.all.secure_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the 'all_secure_redirects' setting within the '/etc/sysctl.conf' file
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	1770
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.all.secure_redirects
+/etc/sysctl.conf
+
+1.	Check the current setting of the parameter:
+# grep ‘net.ipv4.conf.all.secure_redirects = 0’ /etc/sysctl.conf
+2.	If not found, set the following parameter in the /etc/sysctl.conf file:
+net.ipv4.conf.all.secure_redirects = 0
+3.	Additionally, run the following commands to set the active kernel parameters:
+# sysctl -w net.ipv4.conf.all.secure_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+ 
+Control: Status of the current setting for 'net.ipv4.conf.default.secure_redirects' network parameter
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	5961
+Criticality Label	CRITICAL
+Artifact / File / Directory	net.ipv4.conf.default.secure_redirects
+
+1.	Check the current setting of the parameter:
+# sysctl net.ipv4.conf.default.secure_redirects
+2.	If not set to “0”, run the following commands to set the active kernel parameters
+# sysctl -w net.ipv4.conf.default.secure_redirects=0
+# sysctl -w net.ipv4.route.flush=1
+
+ 
+Control: Status of the 'dev|nodev' mount option settings for the '/tmp' partition in the '/etc/fstab' file.
+Audit & Remediate: Ensure nodev option set on /tmp partition.
+
+Control ID	7395
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E ‘^.*\s/tmp\s.*\bnodev\b.*$’ /etc/fstab
+# grep “/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the /tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nodev /tmp
+ 
+Control: Status of the 'nodev' option for '/tmp' partition using 'mount' command
+
+Audit & Remediate: Ensure nodev option set on /tmp partition.
+
+Control ID	14599
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E ‘^.*\s/tmp\s.*\bnodev\b.*$’
+# mount | grep “/tmp”
+2.	Remount the file-system as shown below:
+# mount -o remount,nodev /tmp
+ 
+Control: Status of the mount-option 'suid|nosuid' set for '/tmp' partition in file '/etc/fstab'
+Audit & Remediate: Ensure nosuid option set on /tmp partition.
+
+Control ID	7396
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/tmp\s.*\bnosuid\b.*$” /etc/fstab
+# grep “/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nosuid to the fourth field (mounting options) for the /tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nosuid /tmp
+ 
+Control: Status of the 'exec|noexec' mount-option settings for '/tmp' partition in file '/etc/fstab'
+Audit & Remediate: Ensure noexec option set on /tmp partition.
+
+Control ID	7397
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/tmp\s.*\bnoexec\b.*$” /etc/fstab
+# grep “/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the /tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,noexec /tmp
+ 
+Control: Status of the 'noexec' option for '/tmp' partition using 'mount' command
+Audit & Remediate: Ensure noexec option set on /tmp partition.
+
+Control ID	1463
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/tmp\s.*\bnoexec\b.*$”
+# mount | grep “/tmp”
+2.	Remount the file-system as shown below:
+# mount -o remount,noexec /tmp
+ 
+Control: Status of the 'dev|nodev' mount option settings for the '/var/tmp' partition in the '/etc/fstab' file.
+Audit & Remediate: Ensure nodev option set on /var/tmp partition.
+
+Control ID	10657
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/tmp
+
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/var/tmp\s.*\bnodev\b.*$” /etc/fstab
+# grep “/var/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the /var/tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nodev /var/tmp
+
+ 
+Control: Status of the 'nodev' option for '/var/tmp' partition using 'mount' command
+Audit & Remediate: Ensure nodev option set on /var/tmp partition.
+
+Control ID	14600
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/tmp
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/var/tmp\s.*\bnodev\b.*$” 
+# mount | grep “/var/tmp”
+2.	Remount the file-system as shown below:
+# mount -o remount,nodev /var/tmp
+ 
+Control: Status of the 'suid|nosuid' mount option settings for the '/var/tmp' partition in the '/etc/fstab' file.
+Audit & Remediate: Ensure nosuid option set on /var/tmp partition.
+
+Control ID	10658
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/tmp
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/var/tmp\s.*\bnosuid\b.*$”  /etc/fstab
+# grep “/var/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nosuid to the fourth field (mounting options) for the /tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nosuid /tmp
+ 
+Control: Status of the 'exec|noexec' mount option settings for the '/var/tmp' partition in the '/etc/fstab' file
+Audit & Remediate: Ensure noexec option set on /var/tmp partition.
+
+Control ID	10659
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/tmp
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/var/tmp\s.*\bnoexec\b.*$”  /etc/fstab
+# grep “/var/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the /tmp partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,noexex /tmp
+ 
+Control: Status of the 'noexec' option for '/var/tmp' partition using 'mount' command
+Audit & Remediate: Ensure noexec option set on /var/tmp partition.
+
+Control ID	14605
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/tmp
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/var/tmp\s.*\bnoexec\b.*$” 
+# mount | grep “/var/tmp”
+2.	Remount the file-system as shown below:
+# mount -o remount,noexec /var/tmp
+ 
+Control: Status of the 'nodev' mount option setting for the '/home partition' defined in the '/etc/fstab' file
+Audit & Remediate: Ensure nodev option set on /home partition.
+
+Control ID	7403
+Criticality Label	CRITICAL
+Artifact / File / Directory	/home
+
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/home\s.*\bnodev\b.*$” /etc/fstab
+# grep “/var/tmp” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the /home partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nodev /home
+ 
+Control: Status of the 'nodev' option for '/home' partition using 'mount' command
+Audit & Remediate: Ensure noexec option set on /var/tmp partition.
+
+Control ID	14601
+Criticality Label	CRITICAL
+Artifact / File / Directory	/home
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/home\s.*\bnodev\b.*$”
+# mount | grep “/home”
+2.	Remount the file-system as shown below:
+# mount -o remount,nodev /home
+ 
+Control: Status of the 'dev|nodev' mount options for the '/dev/shm' partition in the '/etc/fstab' file
+Audit & Remediate: Ensure nodev option set on /dev/shm partition.
+
+Control ID	7405
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/dev/shm\s.*\bnodev\b.*$” /etc/fstab
+# grep “/dev/shm” /etc/fstab
+
+1.	Edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the /dev/shm partition.
+
+2.	Additionally, remount the file-system as shown below:
+# mount -o remount,nodev /dev/shm
+ 
+Control: Status of the 'nodev' option for '/dev/shm' partition using 'mount' command
+Audit & Remediate: Ensure nodev option set on /dev/shm partition.
+
+Control ID	14598
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/dev/shm\s.*\bnodev\b.*$”
+# mount | grep “/dev/shm”
+2.	Remount the file-system as shown below:
+# mount -o remount,nodev /dev/shm
+3.	Additionally, edit the /etc/fstab file and add nodev to the fourth field (mounting options) for the /dev/shm partition.
+ 
+Control: Status of the 'noexec' option for '/dev/shm' partition using 'mount' command
+Audit & Remediate: Ensure noexec option set on /dev/shm partition.
+
+Control ID	14609
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+1.	The “mount” command lists currently mounted partitions or storage devices. Check if we have a matching mount point entry:
+# mount | grep -E “^.*\s/dev/shm\s.*\bnoexec\b.*$”
+# mount | grep “/dev/shm”
+2.	Remount the file-system as shown below:
+# mount -o remount,nodev /dev/shm
+3.	Additionally, edit the /etc/fstab file and add noexec to the fourth field (mounting options) for the /dev/shm partition.
+ 
+Control: Status of the 'suid|nosuid' mount options for the '/dev/shm' partition in the '/etc/fstab' file
+Audit & Remediate: Ensure nosuid option set on /dev/shm partition.
+
+Control ID	7406
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+
+1.	The following commands would list mount point entries in the /etc/fstab file for a matching entry:
+# grep -E “^.*\s/dev/shm\s.*\bnosuid\b.*$” /etc/fstab
+# grep “/dev/shm” /etc/fstab
+
+2.	Edit the /etc/fstab file and add nosuid to the fourth field (mounting options) for the /dev/shm partition.
+
+3.	Additionally, remount the file-system as shown below:
+# mount -o remount,nosuid /dev/shm
+ 
+Control: Permissions set for the '/etc/hosts.allow' file
+Audit & Remediate: Ensure 644 permission is set on /etc/hosts.allow
+
+Control ID	4784
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/hosts.allow
+
+1.	The following command would not return any text if the permission is not 644:
+# stat /etc/hosts.allow | grep -F "(0644/-rw-r--r--)"
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+2.	If not set as specified, run the following command:
+# chmod 0644 /etc/hosts.allow
+ 
+Control: Ownership set for the '/etc/hosts.allow' file
+Audit & Remediate: Ensure root:root ownership is set on /etc/hosts.allow
+
+Control ID	4783
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/hosts.allow
+
+1.	The following command would not return any text if the ownership is not root:root as shown below:
+# stat /etc/hosts.allow | grep -E "Uid:.+root.+Gid:.+root"
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+2.	If not set as specified, run the following command:
+# chown root:root /etc/hosts.allow
+
+ 
+Control: Permissions set for the '/etc/hosts.deny' file
+Audit & Remediate: Ensure 644 permission is set on '/etc/hosts.deny'
+
+Control ID	4796
+Criticality Label	CRITICAL
+Artifact / File / Directory	'/etc/hosts.deny'
+
+1.	The following command would not return any text if the permission is not 644:
+# stat /etc/hosts.deny | grep -F "(0644/-rw-r--r--)"
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+2.	If not set as specified, run the following command:
+# chmod 0644 /etc/hosts.deny
+ 
+Control: Ownership set for the '/etc/hosts.deny' file
+Audit & Remediate: Ensure root:root ownership is set on /etc/hosts.allow
+
+Control ID	4794
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/hosts.deny
+
+1.	The following command would not return any text if the ownership is not root:root as shown below:
+# # stat /etc/hosts.deny | grep -E "Uid:.+root.+Gid:.+root"
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+2.	If not set as specified, run the following command:
+# chown root:root /etc/hosts.deny
+ 
+Control: Status of iptables package
+Audit & Remediate: Ensure that Package iptables is installed
+
+Control ID	10643
+Criticality Label	CRITICAL
+Artifact / File / Directory	iptables Package / RPM
+
+1.	Check if the iptables package is installed:
+# rpm -q iptables
+
+2.	If not, then install it:
+# yum install iptables
+
+ 
+ 
+Control: Status of the default deny firewall policy
+Audit & Remediate: Ensure default deny firewall policy
+Control ID	10665
+Criticality Label	CRITICAL
+Artifact / File / Directory	iptables Configuration
+
+1.	Check if the iptables is configured to reject or drop all packets / requests or network traffic by default. 
+
+# iptables -L | grep -E "Chain\s+(INPUT|FORWARD|OUTPUT)\s+\(policy\s+ACCEPT\)"
+Chain INPUT (policy ACCEPT)
+Chain FORWARD (policy ACCEPT)
+Chain OUTPUT (policy ACCEPT)
+
+The above check returns ACCEPT for INPUT, FORWARD, and OUTPUT. Hence, it is FAILED. 
+2.	The iptables rules must return either DROP or REJECT for each of the INPUT, FORWARD, and OUTPUT chains:
+
+a.	# iptables -L | grep -E “Chain\s+INPUT\s+\(policy\s+(DROP|REJECT)\)”
+b.	# iptables -L | grep -E “Chain\s+FORWARD\s+\(policy\s+(DROP|REJECT)\)”
+c.	# iptables -L | grep -E “Chain\s+OUTPUT\s+\(policy\s+(DROP|REJECT)\)”
+
+3.	Configura the iptables to create a default DROP policy:
+# iptables -P INPUT DROP 
+# iptables -P OUTPUT DROP 
+# iptables -P FORWARD DROP
+4.	Save the changes:
+# /sbin/service iptables save
+
+ 
+Control: Status of the 'loopback traffic' setting
+Audit & Remediate: Ensure loopback traffic is configured
+
+Control ID	10675
+Criticality Label	CRITICAL
+Artifact / File / Directory	iptables Configuration
+
+1.	Check if the configuration is already present:
+# grep -E "A\s+INPUT\s+-i\s+lo\s+\-j\s+ACCEPT" /etc/sysconfig/iptables
+-A INPUT -i lo -j ACCEPT
+-A INPUT -i lo -j ACCEPT
+# grep -E "A\s+OUTPUT\s+-o\s+lo\s+\-j\s+ACCEPT" /etc/sysconfig/iptables
+-A OUTPUT -o lo -j ACCEPT
+# grep -E "A\s+INPUT\s+-s\s+127\.0\.0\.0/8\s+-j\s+DROP" /etc/sysconfig/iptables
+-A INPUT -s 127.0.0.0/8 -j DROP
+The above test is PASSED.
+2.	Run the following commands to configure the iptables to ensure loopback traffic is configured:
+# iptables -A INPUT -i lo -j ACCEPT
+# iptables -A OUTPUT -o lo -j ACCEPT
+# iptables -A INPUT -s 127.0.0.0/8 -j DROP
+3.	Save the changes:
+# /sbin/service iptables save
+ 
+Control: Status of the 'iptables rules' for all 'open ports' on the host
+Audit & Remediate: Ensure iptables configuration is present.
+
+Control ID	10676
+Criticality Label	CRITICAL
+Artifact / File / Directory	iptables Configuration
+
+1.	Check if the configuration is already present:
+# cat /etc/sysconfig/iptables | grep -E '.+' | grep -v ^#
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+-A INPUT -p tcp -m tcp --dport 8443 -j ACCEPT
+-A OUTPUT -p tcp -m tcp --dport 8443 -j ACCEPT
+COMMIT
+Note: The above configuration is present on the host: 10.115.81.233. The check is PASSED. Other hosts have been reported as FAILED for the check as the configuration file is not present. Example host is: 10.115.4.79 as shown below:
+#cat /etc/sysconfig/iptables
+cat: /etc/sysconfig/iptables: No such file or directory
+
+ 
+Control: Status of the 'rsyslog' service
+Audit & Remediate: Ensure rsyslog Service is enabled.
+
+Control ID	7441
+Criticality Label	CRITICAL
+Artifact / File / Directory	rsyslog
+
+1.	Check if rsyslog is configured to be “on” in run levels 2 through 5:
+# chkconfig --list rsyslog
+rsyslog,0:off 1:off 2:on 3:on 4:on 5:on 6:off
+2.	If not so, set it:
+# chkconfig rsyslog on
+ 
+Control: Status of the '$FileCreateMode' setting within '/etc/rsyslog.conf' file
+Audit & Remediate: Ensure rsyslog default file permissions configured.
+
+Control ID	10666
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/rsyslog.conf
+
+1.	Run the following command and verify that $FileCreateMode is set to 0640:
+# grep ^\$FileCreateMode /etc/rsyslog.conf
+2.	If not, then edit the /etc/rsyslog.conf and set $FileCreateMode to 0640:
+$FileCreateMode 0640
+ 
+Control: Status of the 'syslog-ng' service
+Audit & Remediate: Ensure syslog-ng service is enabled
+
+Control ID	10671
+Criticality Label	CRITICAL
+Artifact / File / Directory	syslog-ng
+
+Note: If syslog-ng is not installed then the test is PASSED.
+# rpm -q syslog-ng
+package syslog-ng is not installed
+Note: Skip the following steps if the package syslog-ng is not installed.
+1.	Check if syslog-ng is configured to be “on” in run levels 2 through 5:
+# chkconfig --list syslog-ng
+syslog-ng,0:off 1:off 2:on 3:on 4:on 5:on 6:off
+2.	If not so, set it:
+# chkconfig syslog-ng on
+
+ 
+Control: Status of the 'perm' option within '/etc/syslog-ng/syslog-ng.conf' file
+Audit & Remediate: Ensure syslog-ng default file permissions configured.
+
+Control ID	10667
+Criticality Label	CRITICAL
+Artifact / File / Directory	syslog-ng
+'/etc/syslog-ng/syslog-ng.conf'
+
+Note: If the syslog-ng package is not installed or the /etc/syslog-ng/syslog-ng.conf file is not present, then the test is PASSED.
+1.	Check the package:
+# rpm -q syslog-ng
+package syslog-ng is not installed
+2.	Check the file:
+# ls /etc/syslog-ng/syslog-ng.conf
+ls: cannot access /etc/syslog-ng/syslog-ng.conf: No such file or directory
+Note: Skip the following steps if the syslog-ng package is not installed or the /etc/syslog-ng/syslog-ng.conf file is not present:
+3.	Run the following command and verify the perm option is 0640:
+# grep ^options /etc/syslog-ng/syslog-ng.conf
+options { chain_hostnames(off); flush_lines(0); perm(0640); stats_freq(3600); threaded(yes); };
+4.	Edit the /etc/syslog-ng/syslog-ng.conf file and set perm option to 0640:
+options { chain_hostnames(off); flush_lines(0); perm(0640); stats_freq(3600);
+threaded(yes); };
+ 
+Control: Status of the currently installed 'rsyslog' package on the host
+Audit & Remediate: Ensure rsyslog is installed.
+
+Control ID	7440
+Criticality Label	CRITICAL
+Artifact / File / Directory	rsyslog Package
+
+1.	Check if the rsyslog package is installed:
+# rpm -q rsyslog
+2.	If not, then install it:
+# yum install rsyslog
+
+Note: Also check Control ID: 10672
+ 
+Control: Status of the installed 'syslog-ng' package on the host
+Audit & Remediate: Ensure syslog-ng is not installed (if rsyslog is already installed).
+
+Control ID	10672
+Criticality Label	CRITICAL
+Artifact / File / Directory	syslog-ng Package
+
+1.	Check if the rsyslog package is installed:
+# rpm -q syslog-ng
+2.	If the package is intalled, then uninstall it:
+# yum erase syslog-ng
+
+Note: Also check Control ID: 7440
