@@ -1,0 +1,1329 @@
+RED HAT ENTERPRISE LINUX 8
+‘CIS – FAILED CONTROLS’ FIXING GUIDE
+By Devarishi Kumar Mahadeva
+
+
+Overview
+Security / Compliance (Global Risk Compliance & Vulnerability) Team has identified failed controls that can be addressed by following the present guide.
+
+Scope
+The present guide is applicable to Controls Labeled as CRITICAL / SERIOUS / URGENT / MEDIUM in the compliance report as shared by the Security / Compliance Team from time to time.
+ 
+Control: Status of the 'Maximum Password Age' setting (expiration) for 'users with a password' setting
+Audit & Remediate: Ensure password expiration is not more than 90 days.
+Control ID	10732
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/shadow
+
+Test
+# grep ^PASS_MAX_DAYS /etc/login.defs
+# for User in $(egrep ^[^:]+:[^\!*] /etc/shadow | cut -d: -f1); do echo "Password Aging Details for User: $User" ; chage --list $User ; echo -e "\n" ; done
+Execute on Test Server
+# grep ^PASS_MAX_DAYS /etc/login.defs
+PASS_MAX_DAYS   90
+# grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,5 | grep -vE ':90'
+root:99999
+Fix
+Backup the File: 
+# cp -pv /etc/login.defs /etc/login.defs-Pre-CIS
+# echo ‘PASS_MAX_DAYS   90’ >>  /etc/login.defs
+Note: The following steps will change the values for the existing accounts:
+# cp -pv /etc/shadow /etc/shadow-Pre-CIS
+# for User in $(grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,5 | grep -vE ':90' | cut -d: -f1 | grep -v root) ; do echo "Changing Password Max Days Value for User: $User" ; chage --maxday 90 $User ; done
+Changing Password Max Days Value for User: USERNAME
+Verify:
+ # grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,5 | grep -vE ':90'
+root:99999
+#
+Note#1: No output should be there.
+Note#2: User “root” is an exceptional case. 
+Check global settings:
+# grep ^PASS_MAX_DAYS /etc/login.defs
+PASS_MAX_DAYS   90
+ 
+Control: Status of the 'Minimum Password Age' for 'users with a password' setting
+Audit & Remediate: Ensure minimum days between password changes is 7 or more.
+Control ID	10733
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/login.defs
+
+Test
+# grep ^PASS_MIN_DAYS /etc/login.defs
+PASS_MIN_DAYS   7
+Execute on Test Server
+# grep ^PASS_MIN_DAYS /etc/login.defs
+PASS_MIN_DAYS   7
+# grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,4 | grep -vE ':7'
+root:0
+Fix
+Backup the File: 
+# cp -pv /etc/login.defs /etc/login.defs-Pre-CIS
+# echo ‘PASS_MIN_DAYS   7’ >> /etc/login.defs
+Note: The following steps will change the values for the existing accounts:
+# cp -pv /etc/shadow /etc/shadow-Pre-CIS
+# for User in $(grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,4 | grep -vE ':7' | cut -d: -f1 | grep -v root) ; do echo "Changing Password Min Days Value for User: $User" ; chage --mindays 7 $User ; done
+Changing Password Min Days Value for User: USERNAME
+Verify:
+# grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,4 | grep -vE ':7'
+root:0
+Note: User “root” is an exceptional case. 
+Check the global settings:
+# grep ^PASS_MIN_DAYS /etc/login.defs
+PASS_MIN_DAYS   7
+ 
+Control: Status of the 'Maximum number of days of inactivity allowed before a user account is locked out' requirement
+Audit & Remediate: Ensure inactive password lock is 30 days or less.
+Control ID	5436
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/default/useradd
+
+Execute on Test Server
+# useradd -D | grep INACTIVE
+INACTIVE=35
+# grep INACTIVE /etc/default/useradd
+INACTIVE=35
+Fix
+Backup the File: 
+# cp -pv /etc/default/useradd  /etc/default/useradd-Pre-CIS
+# useradd -D -f 30
+Verify
+# grep INACTIVE /etc/default/useradd
+INACTIVE=30
+# useradd -D | grep INACTIVE
+INACTIVE=30
+ 
+Control: Status of the 'Maximum number of days of inactivity allowed before a user account is locked out' for 'users with a password' setting
+Audit & Remediate: Ensure inactive password lock is 30 days or less.
+Control ID	10735
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/shadow
+
+Execute on Test Server
+# grep -E ^[^:]+:[^\!*] /etc/shadow | cut -d: -f1,7
+root:
+test:35
+Fix
+Solution is similar to Control ID# 5436
+For existing users with a password set for them, edit the /etc/shadow file:
+The 7th field should be 30 or less for all users with a password.
+Backup the file:
+# cp -pv /etc/shadow  /etc/shadow-Pre-CIS
+List users to be updated:
+# grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,7 | grep -vE ':7' | cut -d: -f1 | grep -v root
+test
+Update the user account:
+# for User in $(grep -E "^[^:]+:[^\!*]" /etc/shadow | cut -d: -f1,7 | grep -vE ':7' | cut -d: -f1 | grep -v root) ; do echo "Changing Password Maximum Inactivity Value for User: $User" ; chage --inactive 30 $User ; done
+Changing Password Maximum Inactivity Value for User: test
+Verify:
+# grep -E ^[^:]+:[^\!*] /etc/shadow | cut -d: -f1,7
+root:
+test:30
+Note: We are not making changes to the “test” user account as this account would not be available on a fresh installation.  
+ 
+Control: Current 'UMASK' setting for the '/etc/bashrc or /etc/bash.bashrc' file
+Audit & Remediate: Ensure default user umask is 027 or more restrictive.
+Control ID	4726
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/bashrc
+/etc/bash.bashrc
+
+Execute on Test Server
+Check which file is in use:
+# ls -l /etc/bashrc /etc/bash.bashrc
+ls: cannot access '/etc/bash.bashrc': No such file or directory
+-rw-r--r--. 1 root root 3011 Mar 25  2020 /etc/bashrc
+#
+Run the following commands and verify all umask lines returned are 027 or more restrictive (077). 
+# grep -nvE "\s?#" /etc/bashrc  | grep umask
+75:       umask 002
+77:       umask 022
+99:umask 077
+Fix
+Backup the file:
+# cp -pv /etc/bashrc  /etc/bashrc-Pre-CIS
+Edit the file and change values in the lines numbered (#75 and #77) noted above:
+# vi /etc/bashrc
+Go to line numbered 75 and 77 and change the umask value to:   umask 027
+Or run the following command:
+# sed -i 's/umask 0[02]2/umask 027/' /etc/bashrc
+Verify
+Check that all the lines with umask are complying with the set criteria of “[0-7][2367]7” as shown below:
+# grep -nvE "\s?#" /etc/bashrc  | grep umask
+75:       umask 027
+77:       umask 027
+99:umask 077  
+Control: Status of 'umask' setting in /etc/profile and /etc/profile.d/*.sh files
+Audit & Remediate: Ensure default user umask is 027 or more restrictive.
+Control ID	12884
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/profile
+/etc/profile.d/*.sh
+
+Execute on Test Server
+# grep -nvE "\s?#" /etc/profile /etc/profile.d/*.sh | grep umask
+/etc/profile:60:    umask 002
+/etc/profile:62:    umask 022
+/etc/profile.d/colorgrep.sh:8:umask 077
+/etc/profile.d/colorls.sh:58:umask 077
+/etc/profile.d/colorsysstat.sh:3:umask 077
+/etc/profile.d/colorxzgrep.sh:5:umask 077
+/etc/profile.d/colorzgrep.sh:7:umask 077
+/etc/profile.d/gawk.sh:32:umask 077
+/etc/profile.d/less.sh:9:umask 077
+/etc/profile.d/vim.sh:6:umask 077
+#
+Fix
+The solution is similar to Control ID# 12884.
+Backup the files that are not compliant or run the following command:
+# for FILE in $(ls /etc/profile /etc/profile.d/*.sh) ; do cp -pv $FILE ${FILE}-Pre-CIS ; done
+'/etc/profile' -> '/etc/profile-Pre-CIS'
+'/etc/profile.d/colorgrep.sh' -> '/etc/profile.d/colorgrep.sh-Pre-CIS'
+'/etc/profile.d/colorls.sh' -> '/etc/profile.d/colorls.sh-Pre-CIS'
+'/etc/profile.d/colorsysstat.sh' -> '/etc/profile.d/colorsysstat.sh-Pre-CIS'
+'/etc/profile.d/colorxzgrep.sh' -> '/etc/profile.d/colorxzgrep.sh-Pre-CIS'
+'/etc/profile.d/colorzgrep.sh' -> '/etc/profile.d/colorzgrep.sh-Pre-CIS'
+'/etc/profile.d/gawk.sh' -> '/etc/profile.d/gawk.sh-Pre-CIS'
+'/etc/profile.d/lang.sh' -> '/etc/profile.d/lang.sh-Pre-CIS'
+'/etc/profile.d/less.sh' -> '/etc/profile.d/less.sh-Pre-CIS'
+'/etc/profile.d/vim.sh' -> '/etc/profile.d/vim.sh-Pre-CIS'
+'/etc/profile.d/which2.sh' -> '/etc/profile.d/which2.sh-Pre-CIS'
+#
+Edit each file that has umask values other than 027 or 077:
+# vi FILE_NAME
+Or 
+Run the following command:
+# sed -i 's/umask 0[02]2/umask 027/' /etc/profile /etc/profile.d/*.sh
+
+Verify
+# grep -nvE "\s?#" /etc/profile /etc/profile.d/*.sh | grep umask                   /etc/profile:60:    umask 027
+/etc/profile:62:    umask 027
+/etc/profile.d/colorgrep.sh:8:umask 077
+/etc/profile.d/colorls.sh:58:umask 077
+/etc/profile.d/colorsysstat.sh:3:umask 077
+/etc/profile.d/colorxzgrep.sh:5:umask 077
+/etc/profile.d/colorzgrep.sh:7:umask 077
+/etc/profile.d/gawk.sh:32:umask 077
+/etc/profile.d/less.sh:9:umask 077
+/etc/profile.d/vim.sh:6:umask 077  
+Control: Status of the Permissions set for the '/etc/passwd-' file
+Audit & Remediate: Ensure permissions on /etc/passwd- are configured.
+Control ID	10690
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/passwd-
+
+
+Execute on Test Server
+Run the following command and verify UID and GID are both 0/root and Access is 600:
+# ls -l /etc/passwd-
+-rw-r--r--. 1 root root 1214 May 14 13:43 /etc/passwd-
+#
+Note: The above test is FAILED.
+Fix
+# chmod 600 /etc/passwd-
+Optionally – if required, run the following command to change ownership:
+# chown root:root /etc/passwd-
+OR
+Run the following commands set to change the ownership and the permissions:
+# chown root:root /etc/passwd- && chmod 600 /etc/passwd-
+Verify
+# ls -l /etc/passwd-
+-rw-------. 1 root root 1214 May 14 13:43 /etc/passwd-
+ 
+Control: Status of the 'world-writable' files and directories on the host
+Audit & Remediate: World-Writable Directories must have Sticky-Bit set on them, and World-Writable Files must have Write Permission removed for Others.
+Control ID	8327
+Criticality Label	CRITICAL
+Artifact / File / Directory	World Writable Files and Directories
+Permissions Set 777 or 666 inclusively.
+
+Execute on Test Server
+Currently these directories are present and they have Sticky Bit set on them, hence they should be OKAY as per CIS Control ID#7408:
+#  df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 2>/dev/null -ls
+      504      0 drwxrwxrwt   2  root     root           40 May 14 14:09 /dev/mqueue
+      591      0 drwxrwxrwt   2  root     root           40 May 14 14:09 /dev/shm
+      591      0 drwxrwxrwt   2  root     root           40 May 14 14:09 /dev/shm
+      128      4 drwxrwxrwt  14  root     root         4096 May 28 18:18 /tmp
+ 12583046      0 drwxrwxrwt   3  root     root           85 May 14 14:10 /var/tmp
+  4194445      0 drwxrwxrwt   2  root     root            6 May 14 14:10 /var/tmp/systemd-private-ca2629fd55cf4dc282f91c78e4dc038b-chronyd.service-izhlPr/tmp
+      128      4 drwxrwxrwt  14  root     root         4096 May 28 18:18 /tmp
+  1048897      0 drwxrwxrwt   2  root     root            6 May 14 14:10 /tmp/systemd-private-ca2629fd55cf4dc282f91c78e4dc038b-chronyd.service-fEjRBR/tmp
+      131      0 drwxrwxrwt   2  root     root            6 May 14 13:36 /tmp/.X11-unix
+  1048896      0 drwxrwxrwt   2  root     root            6 May 14 13:36 /tmp/.ICE-unix
+  2117760      0 drwxrwxrwt   2  root     root            6 May 14 13:36 /tmp/.XIM-unix
+  3145984      0 drwxrwxrwt   2  root     root            6 May 14 13:36 /tmp/.font-unix
+      132      0 drwxrwxrwt   2  root     root            6 May 14 13:36 /tmp/.Test-unix
+Running the scan shows these world-writable files:
+#  df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002 2>/dev/null -ls
+  3145988      4 -rwxrwxrwx   1  root     root           17 Sep 13  2020 /tmp/packages/complex_name
+  3145989      4 -rwxrwxrwx   1  root     root          596 Sep 13  2020 /tmp/packages/complex_name.sh
+  3145991    120 -rwxrwxrwx   1  root     root       122880 Sep 13  2020 /tmp/packages/openldap.tar
+  3145992    140 -rwxrwxrwx   1  root     root       143360 Sep 13  2020 /tmp/packages/pam.tar
+  3145994   1272 -rwxrwxrwx   1  root     root      1302436 Sep 13  2020 /tmp/packages/puppet-3.6.2-3.el7.noarch.rpm
+  3145995  20172 -rwxrwxrwx   1  root     root     20653656 Sep 13  2020 /tmp/packages/puppet-agent-5.5.12-1.el7sat.x86_64.rpm
+  3145996      4 -rwxrwxrwx   1  root     root         1096 Sep 13  2020 /tmp/packages/puppet.conf
+  3145997     20 -rwxrwxrwx   1  root     root        19872 Sep 13  2020 /tmp/packages/puppet-firewalld-0.1.3-1.el7.noarch.rpm
+  3145998    224 -rwxrwxrwx   1  root     root       227709 Sep 13  2020 /tmp/packages/puppetlabs-stdlib-4.25.1-1.el7.noarch.rpm
+  3145999     24 -rwxrwxrwx   1  root     root        24068 Sep 13  2020 /tmp/packages/puppet-server-3.6.2-3.el7.noarch.rpm
+  3146000     88 -rwxrwxrwx   1  root     root        86068 Sep 13  2020 /tmp/packages/rubygem-rgen-0.6.6-2.el7.noarch.rpm
+  3146001      4 -rwxrwxrwx   1  root     root          608 Sep 13  2020 /tmp/packages/sssd.conf
+  3146002     12 -rwxrwxrwx   1  root     root        10240 Sep 13  2020 /tmp/packages/sssd.tar
+
+Fix
+The following command removes the “write” permissions from world-writable files:
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002 2>/dev/null | xargs chmod o-w
+Verify
+#  df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type f -perm -0002 2>/dev/null –ls
+Control: Status of the home directory ownership and permissions for the user accounts (non-system users) defined within the /etc/passwd file
+Audit & Remediate: User accounts must have correct permissions set for their home directories.
+Control ID	10824
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/passwd
+/home/*
+
+Execute on Test Server
+Currently only this user directory is present and the permissions are looking okay:
+# ls -l /home
+total 0
+drwx------. 3 test test 94 May 28 18:10 test
+#
+Reported as FAILED in the compliance report, permission given to nobody’s home directory is okay as everything depends on the root directory or mount point. Besides, the ownership is given to the root user only.
+# grep nobody /etc/passwd
+nobody:x:65534:65534:Kernel Overflow User:/:/sbin/nologin
+# ls -ld /
+dr-xr-xr-x. 17 root root 245 Apr 16  2020 /
+Fix
+Execute the following commands wherever applicable:
+# chmod 755 <DIRECTORY>
+OR
+# chmod 700 <DIRECTORY>
+Verify
+
+# ls –l /home/
+Or
+# find /home -type d -perm 0700 -o -perm 0755
+/home
+/home/test
+ 
+Control: Current list of groups defined in the file '/etc/passwd' but not in the file '/etc/group'
+Audit & Remediate: Ensure all groups in /etc/passwd exist in /etc/group file too.
+Control ID	5444
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/passwd
+/etc/group
+
+Execute on Test Server
+# for GROUP in $(cut -d: -f4 /etc/passwd) ; do grep $GROUP /etc/group -q || echo "Group $GROUP referenced in /etc/passwd but does not exist in /etc/group" ; done
+Fix
+Consult with stake holders and remove any such group found in the step given above.
+# groupdel <GROUP_NAME>
+ 
+Control: Current list of user accounts with 'existing home directories' defined in /etc/passwd and not present on the host (non-system accounts)
+Audit & Remediate: Ensure user accounts found in the /etc/passwd file have valid home directories referenced therein.
+Control ID	7417
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/passwd
+/home/*
+
+Execute on Test Server
+# for HOME_DIR in $(cut -d: -f6 /etc/passwd) ; do ls -ld $HOME_DIR &>/dev/null || echo "Home Directory $HOME_DIR referenced in /etc/passwd but does not exist." ; done
+Home Directory /var/lib/rngd referenced in /etc/passwd but does not exist.
+Note: The above reported home directory belongs to a system account that does not require a login session or a directory to store data:
+# grep '/var/lib/rngd' /etc/passwd
+rngd:x:993:990:Random Number Generator Daemon:/var/lib/rngd:/sbin/nologin
+Note: The following user account has been reported in the Compliance Report and is a system account (nobody) and does not require “write” permission on the root file-system which has been set as its home directory in the /etc/passwd file. Hence, this is a valid setting and should not be reported as FAILED:
+# grep nobody /etc/passwd
+nobody:x:65534:65534:Kernel Overflow User:/:/sbin/nologin
+# ls -ld /
+dr-xr-xr-x. 17 root root 245 Apr 16  2020 /
+Fix
+Consult with stake holders and update permissions / access as per requirements.
+# chmod u+w </PATH/TO/HOME/DIRECTORY>
+OR
+# mkdir </PATH/TO/HOME/DIRECTORY> && chown user:group </PATH/TO/HOME/DIRECTORY> && chmod 700 </PATH/TO/HOME/DIRECTORY>
+
+ 
+Control: Status of the 'telnet-client' package on the host
+Audit & Remediate: Ensure telnet client / package is not installed.
+Control ID	7948
+Criticality Label	CRITICAL
+Artifact / File / Directory	telnet RPM / Package
+
+Execute on Test Server
+Check if the telnet package is installed:
+# rpm -q telnet
+telnet-0.17-73.el8_1.1.x86_64
+Note: The above check is FAILED.
+Fix
+# yum remove telnet
+…
+Removed:
+  telnet-1:0.17-73.el8_1.1.x86_64
+
+Complete!
+Verify
+# rpm -q telnet
+package telnet is not installed
+ 
+Control: Status of the 'net.ipv6.conf.all.accept_source_route' network parameter configured in any configuration file under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	14394
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/ 
+/run/sysctl.d/
+/usr/lib/sysctl.d/ 
+/etc/sysctl.conf
+
+
+
+Execute on Test Server
+# grep -rF 'net.ipv6.conf.all.accept_source_route' /etc/sysctl.conf /etc/sysctl.d/*.conf /run/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf 2>/dev/null
+#
+OR
+# sysctl net.ipv6.conf.all.accept_source_route
+net.ipv6.conf.all.accept_source_route = 0
+Note: The setting is not found in any of the files in the specified directories however the default setting is looking OKAY.
+Fix
+Set the following parameter in /etc/sysctl.conf or a /etc/sysctl.d/* file:
+# cp -pv /etc/sysctl.conf /etc/sysctl.conf-Pre-CIS
+# echo 'net.ipv6.conf.all.accept_source_route = 0' >> /etc/sysctl.conf
+Verify
+# grep -rF 'net.ipv6.conf.all.accept_source_route' /etc/sysctl.conf /etc/sysctl.d/*.conf /run/sysctl.d/*.conf /usr/lib/sysctl.d/*.conf 2>/dev/null
+/etc/sysctl.conf:net.ipv6.conf.all.accept_source_route = 0
+/etc/sysctl.d/99-sysctl.conf:net.ipv6.conf.all.accept_source_route = 0
+# ls -l /etc/sysctl.d/99-sysctl.conf
+lrwxrwxrwx. 1 root root 14 May 22  2020 /etc/sysctl.d/99-sysctl.conf -> ../sysctl.conf
+#
+ 
+Control: Status of the 'net.ipv6.conf.default.accept_source_route' parameter in the /etc/sysctl.conf file
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	14396
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.conf
+
+Execute on Test Server
+# grep -F 'net.ipv6.conf.default.accept_source_route' /etc/sysctl.conf
+#
+Fix
+Set the following parameter in /etc/sysctl.conf:
+# cp -pv /etc/sysctl.conf /etc/sysctl.conf-Pre-CIS
+# echo 'net.ipv6.conf.default.accept_source_route = 0'  >> /etc/sysctl.conf
+Verify
+ # grep -F 'net.ipv6.conf.default.accept_source_route' /etc/sysctl.conf net.ipv6.conf.default.accept_source_route = 0
+OR
+# sysctl net.ipv6.conf.default.accept_source_route
+net.ipv6.conf.default.accept_source_route = 0
+ 
+Control: Status of the /tmp partition using systemctl utility (Tmp.mount service status)
+Audit & Remediate: Ensure /tmp is configured.
+
+Control ID	10860
+Criticality Label	CRITICAL
+Artifact / File / Directory	/tmp
+
+Execute on Test Server
+Check that /tmp is mounted:
+# mount | grep -E '\s/tmp\s'
+/dev/mapper/vg00-tmpvol on /tmp type xfs (rw,nosuid,nodev,noexec,relatime,seclabel,attr2,inode64,noquota)
+#
+Check tmpfs has mounted on /tmp:
+# grep -E '\s/tmp\s' /etc/fstab | grep -E -v '^\s*#'
+/dev/mapper/vg00-tmpvol    /tmp                    xfs     defaults,nodev,nosuid,noexec 0 0
+#
+# systemctl is-enabled tmp.mount
+generated
+Fix
+Create the following file if it does not already exist and place the contents into it as shown below:
+# ls -l /etc/systemd/system/tmp.mount
+ls: cannot access '/etc/systemd/system/tmp.mount': No such file or directory
+# cat > /etc/systemd/system/tmp.mount
+[Unit]
+SourcePath=/etc/fstab
+Documentation=man:fstab(5) man:systemd-fstab-generator(8)
+Before=local-fs.target
+
+[Mount]
+Where=/tmp
+What=/dev/mapper/sysvg-tmplv
+Type=xfs
+Options=defaults,nodev,nosuid,noexec
+
+# Make 'systemctl enable tmp.mount' work:
+[Install]
+WantedBy=local-fs.target
+# systemctl daemon-reload
+# systemctl enable tmp.mount
+Created symlink /etc/systemd/system/local-fs.target.wants/tmp.mount → /etc/systemd/system/tmp.mount.
+Verify
+# systemctl is-enabled tmp.mount
+enabled
+# ls -l /usr/lib/systemd/system/tmp.mount
+-rw-r--r--. 1 root root 782 May 22  2020 /usr/lib/systemd/system/tmp.mount
+Note: Documentation is found here:
+https://access.redhat.com/solutions/5386401
+Control: Status of the firewalld service
+Audit & Remediate: Check that firewalld is configured / enabled.
+
+Control ID	9334
+Criticality Label	CRITICAL
+Artifact / File / Directory	firewalld Service
+
+Execute on Test Server
+# systemctl is-enabled firewalld
+disabled
+# firewall-cmd --state
+not running
+Fix
+Note: It is recommended that Control ID# 10676 should be implemented first to allow valid connections such as ssh.
+Enable the firewalld service 
+# systemctl --now enable firewalld
+Created symlink /etc/systemd/system/dbus-org.fedoraproject.FirewallD1.service → /usr/lib/systemd/system/firewalld.service.
+Created symlink /etc/systemd/system/multi-user.target.wants/firewalld.service → /usr/lib/systemd/system/firewalld.service.
+Note: The system may stop responding as sshd service would require a restart. Login to the console and restart sshd.
+Verify
+# systemctl is-enabled firewalld
+enabled
+# firewall-cmd --state
+Running
+ 
+Control: Status of the 'loopback traffic' setting
+Audit & Remediate: Ensure loopback traffic is configured.
+
+Control ID	10675
+Criticality Label	CRITICAL
+Artifact / File / Directory	Network Interface
+
+Note: Check Control ID# 10676 – it covers Control ID# 10675 as well.
+Execute on Test Server
+Run the following commands and verify output includes the listed rules in order:
+#  iptables -L INPUT -v -n
+Chain INPUT (policy ACCEPT 896 packets, 423K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+ #  iptables -L OUTPUT -v -n
+Chain OUTPUT (policy ACCEPT 701 packets, 256K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+ #
+Fix
+If the interface lo is not configured / not listed in the output shown above, run the following commands:
+# iptables -A INPUT -i lo -j ACCEPT
+#  iptables -A OUTPUT -o lo -j ACCEPT
+#  iptables -A INPUT -s 127.0.0.0/8 -j DROP
+Verify
+#  iptables -L INPUT -v -n
+Chain INPUT (policy ACCEPT 896 packets, 423K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+    0     0 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0
+    0     0 DROP       all  --  *      *       127.0.0.0/8          0.0.0.0/0
+#  iptables -L OUTPUT -v -n
+Chain OUTPUT (policy ACCEPT 701 packets, 256K bytes)
+ pkts bytes target     prot opt in     out     source               destination
+    0     0 ACCEPT     all  --  *      lo      0.0.0.0/0            0.0.0.0/0
+#
+Note: Documentation is found here:
+https://secscan.acron.pl/centos7/3/6/3
+
+ 
+Control: Status of the 'iptables rules' for all 'open ports' on the host
+Audit & Remediate: Configure iptables.
+
+Control ID	10676
+Criticality Label	CRITICAL
+Artifact / File / Directory	Network Interfaces / Ports
+
+Execute on Test Server
+Check the rules:
+# iptables -L
+Fix
+Create the following file iptables_rules.sh and place the contents into it:
+# cat >iptables_rules.sh
+#!/bin/bash
+# Flush IPtables rules 
+
+iptables -F
+
+# Ensure default deny firewall policy
+
+iptables -P INPUT DROP 
+iptables -P OUTPUT DROP 
+iptables -P FORWARD DROP
+
+# Ensure loopback traffic is configured 
+
+iptables -A INPUT -i lo -j ACCEPT
+
+iptables -A OUTPUT -o lo -j ACCEPT 
+iptables -A INPUT -s 127.0.0.0/8 -j DROP 
+
+# Ensure outbound and established connections are configured 
+
+iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT 
+iptables -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT 
+iptables -A OUTPUT -p icmp -m state --state NEW,ESTABLISHED -j ACCEPT 
+iptables -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT 
+iptables -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT 
+iptables -A INPUT -p icmp -m state --state ESTABLISHED -j ACCEPT 
+
+# Open inbound ssh(tcp port 22) connections 
+iptables -A INPUT -p tcp --dport 22 -m state --state NEW -j ACCEPT
+#
+Execute the shell script we created. 
+# chmod +x iptables_rules.sh
+# ./iptables_rules.sh
+Verify
+
+# iptables -L
+Chain INPUT (policy DROP)
+target     prot opt source               destination
+ACCEPT     all  --  anywhere             anywhere
+DROP       all  --  127.0.0.0/8          anywhere
+ACCEPT     tcp  --  anywhere             anywhere             state ESTABLISHED
+ACCEPT     udp  --  anywhere             anywhere             state ESTABLISHED
+ACCEPT     icmp --  anywhere             anywhere             state ESTABLISHED
+ACCEPT     tcp  --  anywhere             anywhere             tcp dpt:ssh state NEW
+
+Chain FORWARD (policy DROP)
+target     prot opt source               destination
+
+Chain OUTPUT (policy DROP)
+target     prot opt source               destination
+ACCEPT     all  --  anywhere             anywhere
+ACCEPT     tcp  --  anywhere             anywhere             state NEW,ESTABLISHED
+ACCEPT     udp  --  anywhere             anywhere             state NEW,ESTABLISHED
+ACCEPT     icmp --  anywhere             anywhere             state NEW,ESTABLISHED  
+Control: Status of the IPv6 firewall rules configured for loopback traffic
+Audit & Remediate: Configure iptables for IPv6 Firewall Rules.
+
+Control ID	14402
+Criticality Label	CRITICAL
+Artifact / File / Directory	Network Interfaces / Ports
+
+Execute on Test Server
+Check the rules:
+# iptables -L
+Fix
+Create the following file ipv6.firewall.sh and place the contents into it:
+# cat > ipv6.firewall.sh
+#!/bin/bash
+# Flush ip6tables  rules
+ip6tables  -F
+
+# Ensure default deny firewall policy
+ip6tables  -P INPUT DROP
+ip6tables  -P OUTPUT DROP
+ip6tables  -P FORWARD DROP
+
+# Ensure loopback traffic is configured
+ip6tables  -A INPUT -i lo -j ACCEPT
+ip6tables  -A OUTPUT -o lo -j ACCEPT
+ip6tables  -A INPUT -s ::1 -j DROP
+
+# Ensure outbound and established connections are configured
+
+ip6tables  -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+ip6tables  -A OUTPUT -p udp -m state --state NEW,ESTABLISHED -j ACCEPT
+ip6tables  -A OUTPUT -p icmp -m state --state NEW,ESTABLISHED -j ACCEPT
+ip6tables  -A INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+ip6tables  -A INPUT -p udp -m state --state ESTABLISHED -j ACCEPT
+ip6tables  -A INPUT -p icmp -m state --state ESTABLISHED -j ACCEPT
+
+# Open inbound ssh(tcp port 22) connections
+
+ip6tables  -A INPUT -p tcp --dport 22 -m state --state NEW -j ACCEPT
+#
+Execute the shell script we created:
+# chmod +x ipv6.firewall.sh
+# ./iptables_rules.sh
+Verify
+# ip6tables -L
+Chain INPUT (policy DROP)
+target     prot opt source               destination
+ACCEPT     all      anywhere             anywhere
+DROP       all      localhost            anywhere
+ACCEPT     tcp      anywhere             anywhere             state ESTABLISHED
+ACCEPT     udp      anywhere             anywhere             state ESTABLISHED
+ACCEPT     icmp     anywhere             anywhere             state ESTABLISHED
+ACCEPT     tcp      anywhere             anywhere             tcp dpt:ssh state NEW
+
+Chain FORWARD (policy DROP)
+target     prot opt source               destination
+
+Chain OUTPUT (policy DROP)
+target     prot opt source               destination
+ACCEPT     all      anywhere             anywhere
+ACCEPT     tcp      anywhere             anywhere             state NEW,ESTABLISHED
+ACCEPT     udp      anywhere             anywhere             state NEW,ESTABLISHED
+ACCEPT     icmp     anywhere             anywhere             state NEW,ESTABLISHED 
+ 
+Control: Status of the 'noexec' option for '/dev/shm' partition using 'mount' command
+Audit & Remediate: Ensure noexec option is set on /dev/shm partition.
+Control ID	14609
+Criticality Label	CRITICAL
+Artifact / File / Directory	/dev/shm
+
+Execute on Test Server
+# mount | grep 'shm'
+Fix
+If “noexec” is not set, set it by editing the /etc/fstab file:
+Backup the file:
+# cp -pv /etc/fstab /etc/fstab-Pre-CIS
+Add a line similar to this one:
+# grep ^shm /etc/fstab
+shm /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0
+# echo “shm /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0” >>  /etc/fstab
+# mount -a
+# mount -o remount,noexec /dev/shm
+Note: A reboot may be required for the /etc/fstab file to be reloaded / reread, if “mount -a” does not load the shm file-system entry as expected.
+Verify
+# mount | grep shm
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,noexec,seclabel)
+# grep shm /etc/fstab
+shm /dev/shm tmpfs defaults,nodev,nosuid,noexec 0 0
+Control: Current list of world writable directories that do not have the sticky bit configured
+Audit & Remediate: Ensure sticky-bit is set on world-writable directories such as /tmp.
+
+Control ID	7408
+Criticality Label	CRITICAL
+Artifact / File / Directory	Directories with 777 permissions without Sticky Bit
+
+Execute on Test Server
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -a ! -perm -1000 2>/dev/null
+Fix
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -a ! -perm -1000 2>/dev/null | xargs chmod a+t
+Verify
+# df -l -P | awk 'NR!=1{print $6}' | xargs -I '{}' find '{}' -xdev -type d -perm -0002 -a ! -perm -1000 2>/dev/null
+No output should return.
+ 
+Control: Status of the 'use_pty' setting in /etc/sudoers and /etc/sudoers.d/ file
+Audit & Remediate: Ensure sudo commands use pty.
+
+Control ID	17126
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sudoers
+/etc/sudoers.d/
+
+Execute on Test Server
+# grep -rEi '^\s*Defaults\s+(\[^#]+,\s*)?use_pty' /etc/sudoers /etc/sudoers.d/
+#
+Fix
+Edit the file /etc/sudoers or a file in /etc/sudoers.d/ with visudo -f and add the following line: 
+# CIS Control ID 17126
+Defaults use_pty
+
+Verify
+Check the file for any errors:
+# visudo -cf /etc/sudoers
+/etc/sudoers: parsed OK
+# grep -rEi '^\s*Defaults\s+(\[^#]+,\s*)?use_pty' /etc/sudoers /etc/sudoers.d/
+/etc/sudoers:Defaults use_pty
+#
+ 
+Control: Permissions set on the file /boot/grub2/grub.cfg
+Audit & Remediate: Ensure permissions on bootloader configuration file are configured.
+
+Control ID	9340
+Criticality Label	CRITICAL
+Artifact / File / Directory	/boot/grub2/grub.cfg
+
+Execute on Test Server
+# ls -l /boot/grub2/grub.cfg
+-rw-r--r--. 1 root root 5150 Apr 16  2020 /boot/grub2/grub.cfg
+#
+Fix
+Group and Others must be denied access to this file:
+# chmod og-rwx /boot/grub2/grub.cfg
+Verify
+# chmod og-rwx /boot/grub2/grub.cfg
+# ls -l /boot/grub2/grub.cfg
+-rw-------. 1 root root 5150 Apr 16  2020 /boot/grub2/grub.cfg
+#
+ 
+Control: Status of the 'kernel.randomize_va_space' parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure address space layout randomization (ASLR) is enabled.
+
+Control ID	12786
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/sysctl.d/
+ /run/sysctl.d/
+/usr/lib/sysctl.d/
+/etc/sysctl.conf
+
+Execute on Test Server
+# sysctl kernel.randomize_va_space
+kernel.randomize_va_space = 2
+ # grep "kernel\.randomize_va_space" /etc/sysctl.conf /etc/sysctl.d/*
+/etc/sysctl.conf:kernel.randomize_va_space=2
+/etc/sysctl.d/99-sysctl.conf:kernel.randomize_va_space=2
+Fix
+No fix is required in the above case as the current setting is looking okay. If not, run the following commands:
+# cp –pv /etc/sysctl.conf /etc/sysctl.conf-Pre-CIS
+# echo “kernel.randomize_va_space=2” >> /etc/sysctl.conf
+# sysctl -w kernel.randomize_va_space=2
+Verify
+Check that the file has been updated as done in the steps above.
+Control: Status of the '$FileCreateMode' setting within '/etc/rsyslog.conf' file
+Audit & Remediate: Ensure rsyslog default file permissions are configured.
+Control ID	10666
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/rsyslog.conf
+
+Execute on Test Server
+Run the following command and verify that $FileCreateMode is set to 0640:
+# grep ^\$FileCreateMode /etc/rsyslog.conf
+
+Fix
+If not, take a backup of the /etc/rsyslog.conf file and set $FileCreateMode to 0640:
+# cp -pv /etc/rsyslog.conf /etc/rsyslog.conf-Pre-CIS
+'/etc/rsyslog.conf' -> '/etc/rsyslog.conf-Pre-CIS'
+Add this line:
+# echo '$FileCreateMode 0640' >> /etc/rsyslog.conf
+Verify
+ # grep ^\$FileCreateMode /etc/rsyslog.conf
+$FileCreateMode 0640
+ 
+Control: Status of the 'ForwardToSyslog' attribute in '/etc/systemd/journald.conf' file
+Audit & Remediate: Ensure journald is configured to send logs to rsyslog.
+
+Control ID	17131
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/systemd/journald.conf
+
+Execute on Test Server
+# grep ForwardToSyslog /etc/systemd/journald.conf
+#ForwardToSyslog=no
+Fix
+Set the value to “yes”:
+# cp -pv /etc/systemd/journald.conf /etc/systemd/journald.conf-Pre-CIS
+'/etc/systemd/journald.conf' -> '/etc/systemd/journald.conf-Pre-CIS'
+# echo 'ForwardToSyslog=yes' >> /etc/systemd/journald.conf
+Verify
+# grep ForwardToSyslog /etc/systemd/journald.conf
+#ForwardToSyslog=no
+ForwardToSyslog=yes
+ 
+Control: Status of the 'Compress' attribute in /etc/systemd/journald.conf file
+Audit & Remediate: Ensure journald is configured to compress large log files.
+
+Control ID	17132
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/systemd/journald.conf
+
+Execute on Test Server
+# grep Compress /etc/systemd/journald.conf
+#Compress=yes
+Fix
+Uncomment or Set the value to “yes”:
+# cp -pv /etc/systemd/journald.conf /etc/systemd/journald.conf-Pre-CIS
+# echo 'Compress=yes' >> /etc/systemd/journald.conf
+Verify
+# grep Compress /etc/systemd/journald.conf
+#Compress=yes
+Compress=yes
+ 
+Control: Status of the 'Storage' attribute in '/etc/systemd/journald.conf' file
+Audit & Remediate: Ensure journald is configured to write logfiles to persistent disk.
+
+Control ID	17133
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/systemd/journald.conf
+
+Execute on Test Server
+# grep Storage /etc/systemd/journald.conf
+#Storage=auto
+Fix
+Uncomment or Set the value to “yes”:
+# cp -pv /etc/systemd/journald.conf /etc/systemd/journald.conf-Pre-CIS
+# echo 'Storage=persistent' >> /etc/systemd/journald.conf
+Verify
+ # grep Storage /etc/systemd/journald.conf
+#Storage=auto
+Storage=persistent
+ 
+Control: Status of the 'permission' set for all logfiles in '/var/log' directory
+Audit & Remediate: Ensure permissions on all log files are configured.
+
+Control ID	10673
+Criticality Label	CRITICAL
+Artifact / File / Directory	/var/log/
+
+Execute on Test Server
+# find /var/log -type f -perm /037 -ls -o -type d -perm /026 -ls
+Fix
+# find /var/log -type f -exec chmod g-wx,o-rwx "{}" + -o -type d -exec chmod g-w,o-rwx "{}" +
+Verify
+# find /var/log -type f -perm /037 -ls -o -type d -perm /026 -ls
+No output should be there.
+ 
+Control: Status of the non-directory files set within the global PATH variable
+Audit & Remediate: The PATH variable must not contain any file name or empty directory. 
+
+Control ID	10506
+Criticality Label	CRITICAL
+Artifact / File / Directory	/etc/profile.d
+
+Execute on Test Server
+# for DIR in $(echo $PATH | tr ':' ' ') ; do [ -d $DIR ] || echo "Invalid: $DIR"; done
+Invalid: /root/bin
+Note: The directory “/root/bin” or “/home/username/bin” may get appended to the PATH environment variable in a local file of user’s home directory and can be customized by individual users a shown below:
+# grep PATH /root/.bash_profile
+PATH=$PATH:$HOME/bin
+export PATH
+
+Fix
+Create or update file /etc/profile.d/custom.sh with the following contents:
+# cat >> /etc/profile.d/custom.sh
+# Remove any invalid file or directory name from the PATH variable as per CIS Control ID#10506
+NEW_PATH=''
+for DIR in $(echo $PATH | tr ':' ' ') ; do
+        [ -d $DIR ] && NEW_PATH=${DIR}:${NEW_PATH}
+done
+export PATH=$NEW_PATH
+#
+# chmod 644 /etc/profile.d/custom.sh
+Verify
+# source /etc/profile.d/custom.sh
+# echo $PATH
+/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:
+ 
+Control: Status of the 'TMOUT' setting in the '/etc/bashrc' file (bash shell)
+Audit & Remediate: Ensure default user shell timeout is 900 seconds or less.
+Control ID	2678
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/profile 
+/etc/profile.d/*.sh
+/etc/bashrc
+
+Execute on Test Server
+#  grep "TMOUT" /etc/bashrc /etc/profile /etc/profile.d/*.sh
+Fix
+# cp -pv /etc/bashrc /etc/bashrc-Pre-CIS
+# echo 'readonly TMOUT=900 ; export TMOUT' >> /etc/bashrc
+Verify
+# grep "TMOUT" /etc/bashrc
+readonly TMOUT=900 ; export TMOUT 
+Next, source the file or logout and login back for the change to take place:
+# . /etc/bashrc
+Resetting the value at the shell prompt would return an error:
+# TMOUT=0
+-bash: TMOUT: readonly variable
+# echo $TMOUT
+900  
+Control: Status of the 'TMOUT' setting in the '/etc/profile' file (ksh shell)
+Audit & Remediate: Ensure default user shell timeout is 900 seconds or less.
+Control ID	2679
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/profile
+
+Execute on Test Server
+#  grep "TMOUT" /etc/profile
+Fix
+# cp -pv /etc/profile /etc/profile-Pre-CIS
+# echo 'readonly TMOUT=900 ; export TMOUT' >> /etc/profile
+ Verify
+# grep "TMOUT" /etc/profile
+readonly TMOUT=900 ; export TMOUT
+Next, source the file or logout and login back for the change to take place:
+# . /etc/profile
+Resetting the value at the shell prompt would return an error:
+# TMOUT=0
+-bash: TMOUT: readonly variable
+# echo $TMOUT
+900 
+ 
+Control: Status of TMOUT within /etc/profile.d/ directory
+Audit & Remediate: Ensure timeout value is set for login sessions. 
+
+Control ID	13376
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/profile.d
+
+Execute on Test Server
+#  grep TMOUT /etc/profile.d/*
+Fix
+# cp -pv /etc/profile.d/sh.local /etc/profile.d/sh.local-Pre-CIS
+# echo 'readonly TMOUT=900 ; export TMOUT' >> /etc/profile.d/sh.local
+Verify
+# grep TMOUT /etc/profile.d/*
+/etc/profile.d/sh.local:readonly TMOUT=900 ; export TMOUT
+Next, source the file for the environment variable to be effective: 
+# . /etc/profile.d/sh.local
+-bash: TMOUT: readonly variable
+Note: Ignore the above warning message.  
+Control: Status of the 'rpcbind' service
+Audit & Remediate: Ensure RPC is not enabled
+
+Control ID	1202
+Criticality Label	SERIOUS
+Artifact / File / Directory	rpcbind
+
+Execute on Test Server
+# systemctl status rpcbind
+Unit rpcbind.service could not be found.
+Fix
+No fix is required as the rpcbind is not on the system. Otherwise, execute this command:
+# systemctl --now disable rpcbind
+
+Verify
+# systemctl is-enabled rpcbind
+Failed to get unit file state for rpcbind.service: No such file or directory
+Note: output could also be “Disabled”.
+Or
+# ps -ef |grep rpcbind 
+No output should be there. 
+Control: Status of the 'net.ipv6.conf.default.accept_redirects' network parameter configured under '/etc/sysctl.d/', '/run/sysctl.d/' or '/usr/lib/sysctl.d/' directories
+Audit & Remediate: Ensure ICMP redirects are not accepted.
+
+Control ID	12806
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/sysctl.conf
+
+Execute on Test Server
+# sysctl net.ipv6.conf.default.accept_redirects
+net.ipv6.conf.default.accept_redirects = 0
+# grep net.ipv6.conf.default.accept_redirects /etc/sysctl.conf
+#
+Fix
+# cp -pv /etc/sysctl.conf /etc/sysctl.conf-Pre-CIS
+# echo “net.ipv6.conf.default.accept_redirects = 0” >> /etc/sysctl.conf
+Verify
+# grep -F 'net.ipv6.conf.default.accept_redirects'  /etc/sysctl.conf
+net.ipv6.conf.default.accept_redirects = 0
+ 
+Control: Status of the firewall drop policy for input, forward and output base chains in nftables
+Audit & Remediate: Ensure nftables is configured with default settings to DROP all packets and ACCEPT only selected ones such as SSH and ICMP, etc.
+
+Control ID	17158
+Criticality Label	SERIOUS
+Artifact / File / Directory	nftables
+
+Execute on Test Server
+# systemctl is-enabled nftables
+disabled
+# nft list ruleset
+If rules are there, change them as per the CIS recommendation.
+Fix
+Backup the current rules:
+# nft list ruleset > nft_current_ruleset.txt
+Next, create this file “nftables.rules” inside /etc/nftables/ with the contents given below:
+#!/sbin/nft -f
+
+# This nftables.rules config should be saved as /etc/nftables/nftables.rules
+
+# flush nftables rulesset
+flush ruleset
+
+# Load nftables ruleset
+# nftables config with inet table named filter
+
+table inet filter {
+        # Base chain for input hook named input (Filters inbound network packets)
+        chain input {
+                type filter hook input priority 0; policy drop;
+                # Ensure loopback traffic is configured
+                iif "lo" accept
+                ip saddr 127.0.0.0/8 counter packets 0 bytes 0 drop
+                ip6 saddr ::1 counter packets 0 bytes 0 drop
+
+                # Ensure established connections are configured
+                ip protocol tcp ct state established accept
+                ip protocol udp ct state established accept
+                ip protocol icmp ct state established accept
+
+                # Accept port 22(SSH) traffic from anywhere
+                tcp dport ssh accept
+
+                # Accept ICMP and IGMP from anywhere
+
+#               icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, mld-listener-query, mld-listener-report, mld-listener-done, nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, ind-neighbor-solicit, ind-neighbor-advert, mld2-listener-report } accept
+                icmp type { destination-unreachable, router-advertisement, router-solicitation, time-exceeded, parameter-problem } accept
+                ip protocol igmp accept
+        }
+
+        # Base chain for hook forward named forward (Filters forwarded network packets)
+        chain forward {
+                type filter hook forward priority 0; policy drop;
+        }
+
+        # Base chain for hook output named output (Filters outbount network packets)
+        chain output {
+                type filter hook output priority 0; policy drop;
+                # Ensure outbound and established connections are configured
+                ip protocol tcp ct state established,related,new accept
+                ip protocol udp ct state established,related,new accept
+                ip protocol icmp ct state established,related,new accept
+        }
+}
+#
+Execute the following command to make the changes effective:
+# nft -f /etc/nftables/nftables.rules
+Note: No output or error should be there.
+Generate the ruleset file:
+# nft list ruleset > /etc/nftables/nftables.rules
+Backup the original config file:
+# cp /etc/sysconfig/nftables.conf /etc/sysconfig/nftables.conf-Pre-CIS –pv
+Update it with the line given below:
+# echo 'include "/etc/nftables/nftables.rules"' >> /etc/sysconfig/nftables.conf
+Or
+Edit the config file manually and add this line:
+include "/etc/nftables/nftables.rules”
+Verify
+Verify that the line inserted into the config file (in the above step) is present:
+# tail -n 1 /etc/sysconfig/nftables.conf
+include "/etc/nftables/nftables.rules"
+Finally, verify that we are getting these lines in the output – this is as per CIS Compliance Report:
+# grep -E 'type\s*filter\s*hook\s*[input|output|forward].+policy\s*drop\;' /etc/nftables/nftables.rules
+                type filter hook input priority filter; policy drop;
+                type filter hook forward priority filter; policy drop;
+                type filter hook output priority filter; policy drop;
+
+Note: Per CIS Documentation for RHEL 8, nftables should be stopped / disabled. 
+ 
+Control: Status of the sudo log file on the host
+Audit & Remediate: Ensure sudo log file exists.
+
+Control ID	17145
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/sudoers 
+/etc/sudoers.d
+
+Execute on Test Server
+# grep -rEi '^\s*Defaults\s+([^#]+,\s*)?logfile=' /etc/sudoers /etc/sudoers.d/
+No setting found.
+Note: Currently no log is found:
+# find /var/log  -type f | grep sudo
+Fix
+Edit the file /etc/sudoers or a file in /etc/sudoers.d/ with visudo -f and add the following line: 
+# CIS Control ID 17145
+Defaults logfile="/var/log/sudo.log"
+
+Verify
+Check the file for any errors:
+# visudo -cf /etc/sudoers
+/etc/sudoers: parsed OK
+# grep -rEi '^\s*Defaults\s+([^#]+,\s*)?logfile=' /etc/sudoers /etc/sudoers.d/
+/etc/sudoers:Defaults logfile="/var/log/sudo.log"
+Control: Status of the 'pool' setting in '/etc/chrony.conf'
+Audit & Remediate: Ensure chrony is configured.
+
+Control ID	13138
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/chrony.conf
+
+Execute on Test Server
+# grep ^pool /etc/chrony.conf
+pool 2.rhel.pool.ntp.org iburst
+Fix
+Not required as the current setting for pool is configured.
+Verify
+Optionally, check if the service is running:
+# systemctl status chronyd
+● chronyd.service - NTP client/server
+   Loaded: loaded (/usr/lib/systemd/system/chronyd.service; enabled; vendor preset: enabled)
+   Active: active (running) since Mon 2021-05-31 00:38:32 NZST; 1 day 21h ago
+…
+
+ 
+Control: Status of the 'remote log host' setting from /etc/rsyslog.conf file and files mentioned in the 'IncludeConfig' parameter
+Audit & Remediate: Ensure rsyslog is configured to send logs to a remote log host.
+
+Control ID	7371
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/rsyslog.conf
+/etc/rsyslog.d/*.conf
+
+Execute on Test Server
+# grep -E '^\*\.\*\s+@@.+' /etc/rsyslog.conf
+Or
+# grep -E '^\*\.\*\s+@@.+'  /etc/rsyslog.d/*.conf
+Fix
+If not output is returned from the step given above, run these commands:
+# cp -pv /etc/rsyslog.conf /etc/rsyslog.conf-Pre-CIS
+# echo '# Per CIS Control ID 7371, Configure a Remote Host to Send Logs to. Replace the host name loghost.example.com accordingly:' >> /etc/rsyslog.conf
+# echo '#*.* @@loghost.example.com' >> /etc/rsyslog.conf
+# systemctl restart rsyslog
+Verify
+# grep -E '\*\.\*\s+@@.+' /etc/rsyslog.conf
+#*.* @@loghost.example.com
+Note: ‘loghost.example.com’ needs to be replaced with the actual host name for the logs. 
+ 
+Control: Status of the 'LoginGraceTime' setting in the '/etc/ssh/sshd_config' file
+Audit & Remediate: Ensure SSH LoginGraceTime is set to one minute or less.
+
+Control ID	5281
+Criticality Label	SERIOUS
+Artifact / File / Directory	/etc/ssh/sshd_config
+
+Execute on Test Server
+# grep -E '^([1-9]|[1-5][0-9]|60)$' /etc/ssh/sshd_config
+Or
+# sshd -T | grep logingracetime
+logingracetime 120
+Note: The above setting confirms 2 minutes as the login grace time. It is a FAILED condition.
+Fix
+# grep LoginGraceTime /etc/ssh/sshd_config
+#LoginGraceTime 2m
+Change the above line in the file with the following settings:
+LoginGraceTime 60
+
+# cp -pv /etc/ssh/sshd_config /etc/ssh/sshd_config-Pre-CIS
+'/etc/ssh/sshd_config' -> '/etc/ssh/sshd_config-Pre-CIS'
+Before updating the config file, verify the output:
+# sed 's/.*LoginGraceTime.*$/LoginGraceTime 60/' /etc/ssh/sshd_config | grep LoginGraceTime
+LoginGraceTime 60
+Update the file in place:
+# sed -i 's/.*LoginGraceTime.*$/LoginGraceTime 60/' /etc/ssh/sshd_config
+
+To make changes effective, reload the sshd config:
+# systemctl reload sshd
+Verify
+# grep LoginGraceTime /etc/ssh/sshd_config
+LoginGraceTime 60
+ 
+Control: Status of the 'PermitRootLogin' setting in the 'sshd_config' file
+Audit & Remediate: Ensure SSH root login is disabled.
+Control ID	2239
+Criticality Label	URGENT
+Artifact / File / Directory	/etc/ssh/sshd_config
+
+Execute on Test Server
+# grep PermitRootLogin /etc/ssh/sshd_config
+PermitRootLogin yes 
+Note: The above setting confirms that ssh login from root account is enabled. It is a FAILED condition.
+Fix
+Before updating the config file, verify the output:
+# sed 's/PermitRootLogin yes$/PermitRootLogin no/' /etc/ssh/sshd_config | grep PermitRootLogin
+PermitRootLogin no 
+Backup the config file:
+# cp -pv /etc/ssh/sshd_config /etc/ssh/sshd_config-Pre-CIS
+Update the file in place:
+# sed -i 's/PermitRootLogin yes$/PermitRootLogin no/' /etc/ssh/sshd_config
+To make changes effective, reload the sshd config:
+# systemctl reload sshd
+Verify
+# grep PermitRootLogin /etc/ssh/sshd_config
+PermitRootLogin no
+Control: Status of the net.ipv6.conf.all.accept_source_route setting in sysctl.conf
+Audit & Remediate: Ensure source routed packets are not accepted.
+
+Control ID	11728
+Criticality Label	MEDIUM
+Artifact / File / Directory	/etc/sysctl.conf
+
+Execute on Test Server
+# grep -F 'net.ipv6.conf.all.accept_source_route' /etc/sysctl.conf
+net.ipv6.conf.all.accept_source_route = 0
+Note: The above setting is OKAY. The compliance report has flagged it as FAILED.
+Fix
+In case the setting is not as shown in the output above, edit the file and change it accordingly.
+Verify
+# sysctl net.ipv6.conf.all.accept_source_route
+net.ipv6.conf.all.accept_source_route = 0
+ 
+Control: Status of the udf Filesystems (modprobe)
+Audit & Remediate: Ensure mounting of udf files-system is disabled.
+
+Control ID	9711
+Criticality Label	MEDIUM
+Artifact / File / Directory	/etc/modprobe.d/CIS.conf
+/etc/modprobe.d
+
+Execute on Test Server
+# modprobe -n -v udf
+insmod /lib/modules/4.18.0-193.19.1.el8_2.x86_64/kernel/lib/crc-itu-t.ko.xz
+insmod /lib/modules/4.18.0-193.19.1.el8_2.x86_64/kernel/fs/udf/udf.ko.xz
+# lsmod | grep udf
+<No Output>
+The above output from the “modprobe” command shows modules for UDF file-system is present on the host. This is a FAILED condition.
+Fix
+Note:
+The following configuration file is present on the host and it has a comment for the UDF file-system:
+# grep udf /etc/modprobe.d/CIS.conf
+#install udf      /bin/true         # Not enforced, to allow the use of virtual media
+If that is not desirable, uncomment the line and run the following command:
+# rmmod udf
+Verify
+# modprobe -n -v udf 
+install /bin/true
+Check the output looks as shown above.
+ 
+Control: Status of permissions on all SSH private key files
+Audit & Remediate: Ensure permissions on SSH private host key files are configured for the owner / user only – group and other must not have any permissions.
+
+Control ID	11705
+Criticality Label	MEDIUM
+Artifact / File / Directory	/etc/ssh
+
+Execute on Test Server
+# find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec ls -l {} \;
+-rw-r-----. 1 root ssh_keys 480 Mar 25  2020 /etc/ssh/ssh_host_ecdsa_key
+-rw-r-----. 1 root ssh_keys 387 Mar 25  2020 /etc/ssh/ssh_host_ed25519_key
+-rw-r-----. 1 root ssh_keys 2578 Mar 25  2020 /etc/ssh/ssh_host_rsa_key
+
+Fix
+# for FILE in $(find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec ls {} \;) ; do echo 'Updating Permission on:' $FILE && chmod 0600 $FILE && chown root:root $FILE && ls -l $FILE; done
+Updating Permission on: /etc/ssh/ssh_host_ecdsa_key
+-rw-------. 1 root root 480 Mar 25  2020 /etc/ssh/ssh_host_ecdsa_key
+Updating Permission on: /etc/ssh/ssh_host_ed25519_key
+-rw-------. 1 root root 387 Mar 25  2020 /etc/ssh/ssh_host_ed25519_key
+Updating Permission on: /etc/ssh/ssh_host_rsa_key
+-rw-------. 1 root root 2578 Mar 25  2020 /etc/ssh/ssh_host_rsa_key
+
+Verify
+# find /etc/ssh -xdev -type f -name 'ssh_host_*_key' -exec ls -l {} \;
+-rw-------. 1 root root 480 Mar 25  2020 /etc/ssh/ssh_host_ecdsa_key
+-rw-------. 1 root root 387 Mar 25  2020 /etc/ssh/ssh_host_ed25519_key
+-rw-------. 1 root root 2578 Mar 25  2020 /etc/ssh/ssh_host_rsa_key
+ 
+Control: Status of the 'MaxStartups' setting in the '/etc/ssh/sshd_config' file
+Audit & Remediate: Ensure SSH MaxStartups is set to “10:30:60”.
+
+Control ID	5284
+Criticality Label	MEDIUM
+Artifact / File / Directory	/etc/ssh/sshd_config
+
+Execute on Test Server
+# grep MaxStartups /etc/ssh/sshd_config
+#MaxStartups 10:30:100
+Note: The above setting is a FAILED condition as the parameter is commented out and has a value which does not meet the compliance requirements.
+Fix
+Before updating the config file, verify the output:
+# sed 's/.*MaxStartups.*$/MaxStartups 10:30:60/' /etc/ssh/sshd_config | grep MaxStartups
+MaxStartups 10:30:60
+Backup the config file:
+# cp -pv /etc/ssh/sshd_config /etc/ssh/sshd_config-Pre-CIS
+Update the file in place:
+# sed -i 's/.*MaxStartups.*$/MaxStartups 10:30:60/' /etc/ssh/sshd_config
+To make changes effective, reload the sshd config:
+# systemctl reload sshd
+Verify
+# grep MaxStartups /etc/ssh/sshd_config
+MaxStartups 10:30:60 
+Control: Status of the 'MaxSessions' setting in the '/etc/ssh/sshd_config' file
+Audit & Remediate: Ensure SSH 'MaxSessions' is set to 4 or less.
+
+Control ID	5373
+Criticality Label	MEDIUM
+Artifact / File / Directory	/etc/ssh/sshd_config
+
+Execute on Test Server
+# grep MaxSessions /etc/ssh/sshd_config
+#MaxSessions 10
+Note: The above setting is a FAILED condition as the parameter is commented out and has a value which does not meet the compliance requirements.
+Fix
+Before updating the config file, verify the output:
+# sed 's/.*MaxSessions.*$/MaxSessions 4/' /etc/ssh/sshd_config | grep MaxSessions
+MaxSessions 4
+Backup the config file:
+# cp -pv /etc/ssh/sshd_config /etc/ssh/sshd_config-Pre-CIS
+Update the file in place:
+# sed -i 's/.*MaxSessions.*$/MaxSessions 4/' /etc/ssh/sshd_config
+To make changes effective, reload the sshd config:
+# systemctl reload sshd
+Verify
+# grep MaxSessions /etc/ssh/sshd_config
+MaxSessions 4
+Or
+# sshd -T | grep maxsessions
+maxsessions 4
+
+
